@@ -110,20 +110,20 @@ def fig_1_system_architecture():
              r"$C_1$: Black Top-Hat ($r{=}7$ px)" + "\n" + r"$C_2$: $101$-px Median Detrend" + "\n" + r"$C_3$: Sato Ridge ($\sigma{\in}\{1..3\}$)",
              facecolor="#FFFDF7", edgecolor="#7D6B4F")
     draw_box(ax, 0.018, 0.07, 0.204, 0.21, "Solar-Disk MAD Norm.",
-             r"$\tilde{C}_k = \mathrm{clip}\!\left(\frac{C_k - \mu_k}{8\,\mathrm{MAD}_k}{+}\frac{1}{2}\right)$" + "\n+ 3,000 Unlabeled Archive Frames",
+             r"$\tilde{C}_k = \mathrm{clip}\!\left(\frac{C_k - \mu_k}{16\,\hat{\sigma}_k}{+}\frac{1}{2}\right)$" + "\n" + r"($\hat{\sigma}_k{=}1.48\,\mathrm{MAD}_k$) + 3k GONG",
              facecolor="#FFFFFF", edgecolor="#7D6B4F")
     draw_arrow(ax, 0.120, 0.67, 0.120, 0.59)
     draw_arrow(ax, 0.120, 0.36, 0.120, 0.28)
 
     # Zone 2 Nodes
-    draw_box(ax, 0.260, 0.67, 0.216, 0.20, "Anchor-Free YOLO11",
-             "YOLO11m / 11l / 11x Teachers\nFull-Disk Scales: $1280^2$ & $1664^2$",
+    draw_box(ax, 0.260, 0.67, 0.216, 0.20, "YOLO11m + YOLOv8s-seg",
+             "YOLO11m ($1280^2, 1664^2$) Boxes\n+ Direct YOLOv8s-seg ($1536^2$)",
              facecolor="#FFFFFF", edgecolor="#2C5E8A")
     draw_box(ax, 0.260, 0.37, 0.216, 0.21, "Two-Stage Faster R-CNN",
              "ResNet50-FPN v2 + RoIAlign\nHigh-Precision Boxes ($F_0, F_1, F_3$)",
              facecolor="#FFFFFF", edgecolor="#2C5E8A")
     draw_box(ax, 0.260, 0.07, 0.216, 0.22, "Noisy-Student Self-Train",
-             "Fold Teachers Label 3k Archive\n3-Flip WBF ($c \\geq 0.25$) → Students\n" + r"($P_1, P_{4a}, P_6, F_1, F_3, s$)",
+             "Fold Teachers Label 3k Archive\n3-Flip WBF ($c \\geq 0.25$) → Students\n" + r"($P_1, P_{4a}, F_1, F_3, s$)",
              facecolor="#E1EFFA", edgecolor="#1E4B75")
     draw_arrow(ax, 0.222, 0.77, 0.260, 0.77)
     draw_arrow(ax, 0.222, 0.47, 0.260, 0.47)
@@ -135,8 +135,8 @@ def fig_1_system_architecture():
     draw_box(ax, 0.514, 0.67, 0.214, 0.20, "Instance-Conditioned Crop",
              r"Box $+20\%$ Context $\to 512\times 512$" + "\nTarget = 1, Neighbor Filaments = 0",
              facecolor="#FFFFFF", edgecolor="#2E7D32")
-    draw_box(ax, 0.514, 0.36, 0.214, 0.23, "3 Segmenter Backbones",
-             "1. U-Net++ EfficientNet-B4 (S1E)\n2. SAM 2.1 Hiera-B+ Adapter\n3. 5-Fold U-Net++ ResNet-34 (e4)",
+    draw_box(ax, 0.514, 0.36, 0.214, 0.23, "3 Segmenter Configs",
+             "1. U-Net++ EffNet-B4 (S1E)\n2. SAM 2.1 Hiera-B+ Adapter\n3. 5-Fold U-Net++ EffNet-B4 (e4)",
              facecolor="#FFFFFF", edgecolor="#2E7D32")
     draw_box(ax, 0.514, 0.07, 0.214, 0.21, "Tversky Loss + 2D Blend",
              r"$\mathcal{L}{=}0.5\,\mathrm{BCE}{+}0.5\,\mathrm{Tversky}(0.3,0.7)$" + "\nPer-Pixel Weight Matrix $W(x,y)$",
@@ -154,7 +154,7 @@ def fig_1_system_architecture():
              r"Confirm Bonus $\Delta c{=}+0.02$ ($F_3 \wedge ms/s$)" + "\n" + r"Vote $\tau_{\mathrm{vote}}{=}0.425$, Floor $c_{\min}{=}0.32$",
              facecolor="#FFFFFF", edgecolor="#5E35B1")
     draw_box(ax, 0.766, 0.07, 0.216, 0.21, "Greedy Panoptic Painting",
-             "Non-Overlapping Canvas Order\nDrop $<70\\%$ Surviving, Area $\\geq 100$\nVal PQ = 0.4856 | 5-Fold = 0.4728",
+             "Non-Overlapping Canvas Order\nDrop $<70\\%$ Surviving, Area $\\geq 100$\nVal PQ = 0.4856 | 5-Fold = 0.4636",
              facecolor="#EDE7F6", edgecolor="#4527A0")
     draw_arrow(ax, 0.728, 0.47, 0.766, 0.75)
     draw_arrow(ax, 0.728, 0.18, 0.766, 0.71)
@@ -181,30 +181,30 @@ def fig_3_progression_and_ablation():
     fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.3), dpi=300,
                              gridspec_kw={"width_ratios": [1.38, 1.15, 1.0], "wspace": 0.36})
 
-    # Panel (a): Paradigm Progression
+    # Panel (a): Paradigm Progression (verified metrics only)
     ax = axes[0]
     stages = [
-        "E01: Semantic\nU-Net (1024²)",
-        "E02: 1-Stage\nYOLO11x-seg",
-        "E04: 2-Stage\nYOLO+UNet++",
-        "E07: Noisy-Stud.\nSelf-Train (P1)",
-        "E16: Per-Pixel\n3-Seg Blend (ms)",
-        "E14: 5-Fold OOF\nTeach+Stud (707)",
-        "E17: 8-Model\nMask-WBF (G17)",
-        "E19: Cross-Fam.\nCont. Vmap",
+        "U-Net + CC\n(5-Fold OOF)",
+        "1-Stage YOLO-seg\n(Fold-0)",
+        "2-Stage G1\n+ avgSAM2",
+        "5-Fold OOF\nms + e4 (707)",
+        "Self-Trained\nStudent P1",
+        "Per-Pixel 3-Seg\nBlend (ms)",
+        "8-Model\nMask-WBF (G17)",
+        "Cross-Fam.\nCont. Vmap",
     ]
-    pqs = [0.2840, 0.4050, 0.4539, 0.4650, 0.4716, 0.4728, 0.4820, 0.4856]
-    colors = ["#cfd8dc", "#b0bec5", "#90caf9", "#64b5f6", "#81c784", "#4db6ac", "#9575cd", "#5e35b1"]
+    pqs = [0.3890, 0.4270, 0.4491, 0.4636, 0.4650, 0.4716, 0.4820, 0.4856]
+    colors = ["#cfd8dc", "#b0bec5", "#90caf9", "#4db6ac", "#64b5f6", "#81c784", "#9575cd", "#5e35b1"]
     y_pos = np.arange(len(stages))
     ax.grid(axis="x", zorder=0)
     bars = ax.barh(y_pos, pqs, height=0.65, color=colors, edgecolor="#111111", linewidth=0.65, zorder=3)
-    ax.axvline(0.4494, color="#d95f02", linestyle="--", linewidth=0.95, zorder=4, label="Human PQ (0.4494)")
+    ax.axvline(0.3398, color="#d95f02", linestyle="--", linewidth=0.95, zorder=4, label="Human PQ (0.3398)")
     for bar, v in zip(bars, pqs):
         ax.text(v + 0.004, bar.get_y() + bar.get_height() / 2, f"{v:.4f}",
                 va="center", ha="left", fontsize=5.0, fontweight="bold", color="#111111", zorder=5)
     ax.set_yticks(y_pos, stages, fontsize=5.0)
     ax.invert_yaxis()
-    ax.set_xlim(0.22, 0.555)
+    ax.set_xlim(0.31, 0.552)
     ax.set_xlabel("Validation Panoptic Quality (PQ)", fontsize=5.8, fontweight="bold")
     ax.set_title("(a) Architecture & Paradigm Progression", fontsize=6.2, fontweight="bold", pad=4)
     ax.legend(loc="upper right", fontsize=4.6, frameon=True, facecolor="white", edgecolor="#cccccc")
@@ -329,12 +329,13 @@ def fig_4_evaluation_distributions():
     ax[1].plot(x_f, rq, "^-.", ms=3.5, lw=0.9, color="#5e35b1", label=f"RQ (mean {np.mean(rq):.3f})", zorder=3)
     ax[1].errorbar(x_f, pq, yerr=[lo, hi], fmt="o-", ms=4.0, lw=1.1, capsize=2.2,
                    color="#1f3b73", label="PQ (5-Fold OOF)", zorder=4)
-    ax[1].axhline(0.4494, color="#d95f02", lw=0.8, ls=":", label="Human PQ (0.4494)", zorder=2)
+    hum_pq = metric.summarize(list(hum.values()))["pq"]
+    ax[1].axhline(hum_pq, color="#d95f02", lw=0.85, ls=":", label=f"Human PQ ({hum_pq:.4f})", zorder=2)
     ax[1].set_xticks(x_f, [f"Fold {k}" for k in x_f], fontsize=5.1)
-    ax[1].set_ylim(0.41, 0.74)
+    ax[1].set_ylim(0.31, 0.74)
     ax[1].set_ylabel("Metric Score", fontsize=5.8, fontweight="bold")
     ax[1].set_title("(b) 5-Fold OOF Stability", fontsize=6.1, fontweight="bold", pad=4)
-    ax[1].legend(fontsize=4.4, frameon=True, facecolor="white", edgecolor="#cccccc", loc="center right")
+    ax[1].legend(fontsize=4.2, frameon=True, facecolor="white", edgecolor="#cccccc", loc="center", bbox_to_anchor=(0.56, 0.52), ncol=1)
     ax[1].tick_params(labelsize=5.1)
 
     # Panel (c): Partner Multiplicity (1-to-1 vs Split/Merge)
