@@ -5,10 +5,10 @@ Solution to the [Solar Filament Segmentation Challenge 2026](https://www.kaggle.
 
 | | |
 |---|---|
-| Out-of-fold PQ (707 training photos, 5 folds grouped by date) | **0.4582** (95% CI 0.4487–0.4664), SQ 0.6911, RQ 0.6630 |
+| Out-of-fold PQ (707 training photos, 5 folds grouped by date) | **0.4636** (95% CI 0.4538–0.4716), SQ 0.6920, RQ 0.6699 |
 | Public leaderboard PQ | **0.40** |
 | Reference: one human annotator scored against another | PQ 0.3398 (SQ 0.6329, RQ 0.5369) |
-| Test inference | ~3.7 s per frame on one T4 |
+| Test inference | ~5.2 s per frame on one T4 |
 
 ![pipeline](figures/pipeline.png)
 
@@ -39,7 +39,7 @@ competition data, enable a GPU, run all. From a shell:
 pip install -r requirements.txt
 export MAGFILO_ROOT=/path/to/MAGFiLO_1.0_Kaggle_2026      # contains train/ and test/
 export FILSEG_WEIGHTS=$PWD/weights                        # released models
-python run.py predict --run final --det m1280 --seg e4 --test
+python run.py predict --run final --det m1280,m1280s --seg e4 --test
 mkdir -p work/cache/final && cp results/tune_final.json work/cache/final/tune.json
 python run.py submit --run final --out submission.csv
 ```
@@ -56,7 +56,7 @@ for k in 0 1 2 3 4; do
   python run.py seg --fold $k --name e4                    # crop segmenter
   python run.py pseudo --fold $k --det m1280 --src work/gong            # self-training set (python scripts/fetch_gong.py work/gong)
   python run.py det --fold $k --name m1280s --extra m1280 --epochs 20   # student detector
-  python run.py predict --run final --det m1280 --seg e4 --fold $k   # out-of-fold proposals
+  python run.py predict --run final --det m1280,m1280s --seg e4 --fold $k   # out-of-fold proposals
 done
 python run.py tune --run final                             # emission rule + out-of-fold PQ
 ```

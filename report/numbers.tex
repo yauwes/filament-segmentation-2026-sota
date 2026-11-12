@@ -3,27 +3,28 @@
 \newcommand{\authorcity}{Jakarta}
 \newcommand{\authorcountry}{Indonesia}
 \newcommand{\authoremail}{panjiaji90@gmail.com}
-\newcommand{\oofpq}{0.458}
-\newcommand{\oofci}{0.449--0.466}
+\newcommand{\oofpq}{0.464}
+\newcommand{\oofci}{0.454--0.472}
 \newcommand{\lbpq}{0.40}
 \newcommand{\humanpq}{0.340}
 \newcommand{\humansq}{0.633}
 \newcommand{\humanrq}{0.537}
 \newcommand{\multiphotos}{296}
 \newcommand{\gridcells}{624}
-\newcommand{\cellsentence}{a mask threshold of 0.6, no morphological erosion or dilation, a confidence floor of 0.225 and a drop share of 0.95}
-\newcommand{\studentsentence}{Each fold's teacher detector produces roughly 18,000 high-confidence pseudo-boxes across the 3,000 archive frames.}
-\newcommand{\ensemblesentence}{On two NVIDIA T4 GPUs, full 5-fold ensemble inference on all 180 test frames completes in 11 minutes ($\approx 3.7$~s per frame on a single T4).}
+\newcommand{\cellsentence}{a mask threshold of 0.7, no morphological erosion or dilation, a confidence floor of 0.275 and a drop share of 0.95}
+\newcommand{\studentsentence}{Standalone, the student detector raises 5-fold out-of-fold PQ from $0.458$ to $0.460$ ($+76$ true positives); fusing teacher and student boxes via Weighted Boxes Fusion raises out-of-fold PQ to $0.464$ by suppressing $113$ false positives.}
+\newcommand{\ensemblesentence}{On two NVIDIA T4 GPUs, full 5-fold teacher--student ensemble inference on all 180 test frames completes in 15.5 minutes ($\approx 5.2$~s per frame on a single T4).}
 \newcommand{\resultrows}{%
-Full (\texttt{m1280}+\texttt{e4}, flip TTA) & \textbf{0.458} (0.449--0.466) & \textbf{0.691} & \textbf{0.663} \\
-$-$ segmenter flip TTA & 0.457 (0.447--0.465) & 0.690 & 0.662 \\
-$-$ detector flip TTA (WBF) & 0.453 (0.443--0.462) & 0.690 & 0.657 \\
+Full (\texttt{m1280,m1280s}+\texttt{e4}, TTA) & \textbf{0.464} (0.454--0.472) & 0.692 & \textbf{0.670} \\
+Student detector only (\texttt{m1280s}+\texttt{e4}) & 0.460 (0.450--0.468) & \textbf{0.693} & 0.664 \\
+Teacher detector only (\texttt{m1280}+\texttt{e4}) & 0.458 (0.449--0.466) & 0.691 & 0.663 \\
+$-$ segmenter flip TTA (on teacher) & 0.457 (0.447--0.465) & 0.690 & 0.662 \\
+$-$ detector flip TTA (on teacher) & 0.453 (0.443--0.462) & 0.690 & 0.657 \\
+$-$ tuned conf.\ floor ($c{=}0.10$) & 0.449 & 0.688 & 0.652 \\
 $-$ matched crop pad ($p{=}0.35$) & 0.444 (0.434--0.452) & 0.678 & 0.654 \\
-$-$ tuned conf.\ floor ($c{=}0.10$) & 0.440 & 0.687 & 0.640 \\
-$-$ neutral morph.\ (1-px erosion) & 0.438 & 0.679 & 0.645 \\
 \midrule
 Annotator vs.\ annotator & 0.340 & 0.633 & 0.537 \\
 }
-\newcommand{\resultstext}{Across all 707 training frames (1,154 annotator records, 8,199 annotated filaments), the 5-fold out-of-fold pipeline achieves $\mathrm{PQ}=0.458$ (95\% date-bootstrap CI 0.449--0.466), $\mathrm{SQ}=0.691$ and $\mathrm{RQ}=0.663$ (5,263 true positives, 2,414 false positives and 2,936 false negatives, emitting 6.66 instances per frame on validation and 6.78 on the 180 test frames). Fold-wise PQ is stable across the five date-grouped splits (0.462, 0.464, 0.442, 0.468 and 0.460; Fig.~\ref{fig:eval}, middle). Among overlapping prediction--annotation pairs, the mean IoU is 0.607 and the mean Dice is 0.736, compared with 0.517 and 0.660 between human annotators on the 296 multi-record frames (Fig.~\ref{fig:eval}, left). Out of 8,199 ground-truth filaments, 78.6\% (6,441) overlap exactly one prediction (one-to-one), 19.4\% (1,593) are missed, and only 2.0\% (165) touch two or more predictions; conversely, 82.5\% (6,336) of predictions overlap a single annotation, 14.6\% (1,124) are unannotated false alarms, and 2.8\% (216) bridge two or more annotations (Fig.~\ref{fig:eval}, right).}
-\newcommand{\examplescaption}{The pipeline captures thin filaments and narrow barbs across GONG sites (e.g.\ 2015-04-21~Bh, 2012-05-19~Th, 2014-02-05~Bh, 2015-07-06~Th); typical disagreements occur on faint active-region fibrils or fragmented remnants where annotators also differ (2015-01-13~Ch, 2014-11-12~Bh).}
-\newcommand{\discussiontext}{\emph{Strengths.} Decoupling detection at 1280~px from segmentation on $512\times512$ native-resolution crops preserves 2--5~px filament barbs ($\mathrm{SQ}=0.691$ vs.\ $0.633$ between humans) while keeping one-to-many fragmentation below 3\%. Training the detector on every annotator record turns box confidence into a calibrated estimate of annotator consensus, which raises PQ by $+0.018$ over an untuned confidence floor ($c{=}0.10$) and $+0.040$ over a strict floor ($c{=}0.40$). Flip TTA with Weighted Boxes Fusion contributes $+0.005$ PQ mainly through recognition quality ($\mathrm{RQ}: 0.657\to0.663$). \emph{Weaknesses and future work.} Because the segmenter is restricted to a padded detector box, long curved filaments whose box is truncated by the detector cannot grow outside the crop; naive inference-time crop padding ($p{=}0.35$) lowers PQ to $0.444$ due to scale mismatch with training ($p{=}0.20$). Training the crop segmenter with random box truncation and multi-scale padding, or adding a lightweight graph-stitching head for broken filament chains, is the most direct path to further gains.}
+\newcommand{\resultstext}{Across all 707 training frames (1,154 annotator records, 8,199 annotated filaments), the full 5-fold teacher--student pipeline (\texttt{m1280,m1280s}+\texttt{e4}) achieves $\mathrm{PQ}=0.464$ (95\% date-bootstrap CI 0.454--0.472), $\mathrm{SQ}=0.692$ and $\mathrm{RQ}=0.670$ (5,288 true positives, 2,301 false positives and 2,911 false negatives, emitting 6.58 instances per frame on validation and 6.70 on the 180 test frames). Fold-wise PQ is consistent across the five date-grouped splits (0.464, 0.469, 0.449, 0.466 and 0.471; Fig.~\ref{fig:eval}, middle). Among overlapping prediction--annotation pairs, the mean IoU is 0.611 and the mean Dice is 0.739, compared with 0.517 and 0.660 between human annotators on the 296 multi-record frames (Fig.~\ref{fig:eval}, left). Out of 8,199 ground-truth filaments, 78.0\% (6,392) overlap exactly one prediction (one-to-one), 20.0\% (1,641) are missed, and only 2.0\% (166) touch two or more predictions; conversely, 83.4\% (6,328) of predictions overlap a single annotation, 13.9\% (1,058) are unannotated false alarms, and 2.7\% (202) bridge two or more annotations (Fig.~\ref{fig:eval}, right).}
+\newcommand{\examplescaption}{The pipeline captures thin filaments and narrow barbs across GONG sites (e.g.\ 2015-04-21~Bh, 2012-05-19~Th, 2015-07-06~Th, 2011-08-03~Mh); typical disagreements occur on faint active-region fibrils or fragmented remnants where annotators also differ (2015-01-13~Ch, 2014-11-12~Bh).}
+\newcommand{\discussiontext}{\emph{Strengths.} Decoupling detection at 1280~px from segmentation on $512\times512$ native-resolution crops preserves 2--5~px filament barbs ($\mathrm{SQ}=0.692$ vs.\ $0.633$ between humans) while keeping one-to-many fragmentation at 2.0\%. Self-training on 3,000 unlabeled GONG frames improves recall ($+76$ true positives for \texttt{m1280s}), and fusing teacher and student boxes via Weighted Boxes Fusion raises recognition quality ($\mathrm{RQ}: 0.663\to0.670$, PQ $0.458\to0.464$). Training the detector on every annotator record turns box confidence into a calibrated estimate of annotator consensus ($+0.015$ PQ over an untuned confidence floor $c{=}0.10$), while flip TTA adds $+0.005$ PQ. \emph{Weaknesses and future work.} Because the segmenter is restricted to a padded detector box, long curved filaments whose box is truncated by the detector cannot grow outside the crop; naive inference-time crop padding ($p{=}0.35$) lowers PQ to $0.444$ due to scale mismatch with training ($p{=}0.20$). Training the crop segmenter with multi-scale padding or adding a graph-stitching head for broken filament chains is the most direct path to further gains.}
