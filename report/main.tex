@@ -25,6 +25,12 @@
 }
 \email{\authoremail}
 
+\author{\coauthorname}
+\affiliation{%
+  \country{\authorcountry}
+}
+\email{\coauthoremail}
+
 \begin{abstract}
 We present our solution to the Solar Filament Segmentation Challenge~2026 for automated instance segmentation of solar filaments in $2048\times 2048$ GONG $\text{H-}\alpha$ observations under Panoptic Quality ($\mathrm{PQ}$) at $\mathrm{IoU} > 0.50$. To preserve thin $2\text{--}6$~px filament spines lost under downsampling while handling strong observer plurality across \multiphotos{} multi-record frames (inter-annotator $\mathrm{PQ} = \humanpq$), our approach decouples the pipeline into four stages: (1)~solar-disk MAD-standardized tri-plane enhancement (black top-hat, $101$-px median detrending, Sato curvilinear ridges); (2)~multi-family full-disk detection (\texttt{YOLO11m}, \texttt{Faster R-CNN} R50-FPN~v2, \texttt{YOLOv8s-seg}) trained on every individual annotator record plus fold-isolated Noisy-Student self-training on $3{,}000$ unlabeled GONG archive frames; (3)~$512\times 512$ instance-conditioned crop segmentation (\texttt{U-Net++} EfficientNet-B4 and fine-tuned \texttt{SAM~2.1} Hiera-B+) under BCE--Tversky loss; and (4)~Cross-Family Continuous Vote-Map Fusion with marginal confirmation calibration and greedy non-overlapping painting. Across $707$ training frames in date-grouped 5-fold cross-validation, our core model achieves $\mathrm{PQ} = \textbf{\oofpq}$ ($95\%$ CI \oofci; $\mathrm{SQ} = \oofsq$, $\mathrm{RQ} = \oofrq$). On held-out Fold~0 ($145$ frames), our 12-stream super-ensemble reaches $\mathrm{PQ} = \textbf{\superpq}$ ($\mathrm{TP} = \supertp$, $\mathrm{FP} = \superfp$, $\mathrm{FN} = \superfn$), winning \textbf{\superwin} of 200 date split-half bootstraps over our 8-model Mask-WBF baseline and attaining \textbf{\lbpq} on the public leaderboard. Code and weights are released at \href{https://github.com/yauwes/solar-filament-segmentation-2026}{github.com/yauwes/solar-filament-segmentation-2026}.
 \end{abstract}
