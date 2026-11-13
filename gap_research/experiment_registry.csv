@@ -1,0 +1,2 @@
+exp_id,parent_exp,stage,hypothesis,dataset_scope,folds,val_metric_name,val_score,nested_cv_score,bootstrap_win_vs_best,lb_score,status,decision,artifact_paths
+EXP-000,main@b4acdb4,Baseline,Reproduce E19 Cross-Family Continuous Vote-Map Super-Ensemble (G17+ms/s/main+F3) on Fold-0 (145 fr) and Test (180 fr),Fold0+Test,Fold0+5F(donors),Val_PQ,0.4856,--,ref,0.402,DONE,BASELINE,results/submission.csv
