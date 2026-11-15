@@ -66,3 +66,66 @@
 | **EXP-006** | **G/D 5-Fold & Trunc** | **5-Fold Cross-Fitting of Top Detectors & Truncation-Aware Segmenters on Kaggle `2×T4`**: (a) Train **5-fold `Faster R-CNN R50-FPN v2`** + GONG student (`F_5fold` instead of Fold-0 only!) — check whether enhanced tri-plane input helps FRCNN vs raw grayscale; (b) Complete **5-fold `seg_e4x` (`--trunc 0.4 --pad-hi 0.6 --grow`)**; (c) Train **5-fold `YOLO11l` / `YOLO11x` or `YOLO11m@1664`** so 100% of training data (`31` matching test dates!) informs test predictions | Isolated Kaggle kernel `ajikajadeh/filseg-gap-*`, check Fold-0 OOF PQ gain paired vs single-fold `F3`/`A`/`e4` | GPU (`2×T4`) | **P1 (Wave 2)** |
 | **EXP-007** | **C/A/D High-Res & Limb** | **SAHI Overlapped `1024×1024` Tiled Detector + Radial Limb Contrast Calibration**: Train & infer a Stage-1 detector on native `1024×1024` crops (preserving `1.0x` pixel resolution on `9–580 px` small filaments!) + test Mauna Loa/Big Bear (`M/B`) contrast/CLAHE-band normalization to recover the **`39%` untouched small filaments** and **`M/B` + `r>0.75` limb recall** | Compare Fold-0 `<580 px` and `r>0.75` recall directly on nested CV + inject into Super-Ensemble | GPU (`2×T4`) | **P1 (Wave 2)** |
 | **EXP-008** | **D/E/I New Segmenter & Soft Pseudo** | **Modern Crop Segmenter Head (`ConvNeXt-Base U-Net++ / UPerNet` or `SwinV2/EVA02` / `SAM2.1` 5-fold) with `Focal-Tversky + Lovász + Boundary Loss` at `640×640`**, PLUS Round-2 ensemble-distilled **consensus pseudo-labeling** on 3,000 GONG frames | Must strictly beat Fold-0 `S1E+e4+SAM2` (`0.4716` on `ms` boxes) on paired bootstrap! | GPU (`2×T4`) | **P2 (Wave 2/3)** |
+
+---
+
+## Wave-1 Empirical Audit & Local Suite Results (2026-11-13)
+
+### Prior Kaggle Kernel Audits Verified Before Wave-2 Launch
+- **`G4` (`filseg-twostage-g4`)**: Arm `E` (`bth7+flat+ridge` at `imgsz=1280`, 29 ep) achieved box `mAP50=0.608` vs standard raw `YOLO11m` (`det_b`/`det_a2`: `mAP50=0.659..0.685`). Full replacement with heavy morphological planes hurts Stage-1 localization compared to raw `[Y]`, whereas `C` (`imgsz=1664`) only reached `mAP50=0.642` at batch 1 in `2.6h`.
+- **`G30` / `G31` (`rfdetr` sliced queries / mixed-tile control)**: RF-DETR alone capped at `PQ=0.3737` (global) vs `0.3712` (mixed, `TP` jumped `790 -> 875`, `+85` true positives with higher `FP`), confirming native-resolution tiling boosts recall on small/faint filaments when paired with strong WBF/precision filtering (`SAHI@1024`).
+- **`seg_e4` / `det_m1280` / `student_b` / `infer-ms` / `infer-s`**: All 5 folds of `det_m1280`, `det_m1280s`, `seg_e4` completed cleanly (`infer-ms` 5-fold OOF `PQ=0.4636`, `infer-s` `0.4599`, `oof_main` `0.4582`), while `ajikajadeh/filseg-a100-weights` already stores `seg_e4x_f0.pth` alongside `seg_e4_f0..4.pth`, `det_m1280_f0..4.pt`, and `det_m1280s_f0,2,4.pt` (`f1,3` in `filseg-student-b`). Only Fold-0 had `seg_e4x`; Folds `1..4` and multi-stream `SAM2+S1E+seg_e4x` application across `ms/s/main/F3/P4a/P6` remain untapped.
+
+### Wave-1 Local Suite (`EXP-001b..005b`) — Conclusive Ceiling on Fixed E19 Caches
+- **E19 Baseline (`EXP-000`, Fold-0 `145` fr / `221` recs / `1,488` GT)**: `PQ=0.4856, SQ=0.6924, RQ=0.7013 (TP=978, FP=323, FN=510)`, Public LB `0.402` (CLI displays `0.40`).
+- **`EXP-001b` (Nested 5-Fold Date-CV Cluster Floor)**: `PQ=0.4845` (`[0.32]*5`) vs `0.4856`.
+- **`EXP-002` / `EXP-002b` (Continuous `[0,1]` Soft Vote-Map / Logit + `P6`)**: `PQ=0.4760..0.4820` (`+P6: 0.4815`) — binary per-member consensus in E19 already outperforms continuous averaging on fixed caches.
+- **`EXP-003` (Scale-Adaptive Mask Probability Threshold under Nested Date-CV)**: Best `PQ=0.4851` vs `0.4856`.
+- **`EXP-004` (Collinear Fragment Stitching `8/12/18 px`)**: `PQ=0.4844` — geometric post-stitching merges/degrades PQ on fixed masks.
+- **`EXP-005b` (Nested Date-CV Meta-Rescorer: LogReg/Ridge/HGBR TP & IoU)**: Every sweep (`a=0.10..1.00`) strictly lost to E19 (`logreg_tp` `0.4786..0.4818`; `ridge_iou` `0.4790..0.4820`; `hgbr_tp a=0.10` `0.4833, vsE19=-0.0023 CI=[-0.0042,-0.0004] P=0.010`; `hgbr_iou a=0.10` `0.4828`).
+- **Wave-1 Verdict**: Post-processing and rescoring on fixed E19 caches is strictly bounded (`<= 0.4856`). Moving Kaggle LB from `0.402` to **`0.4100+` (`0.41++`)** requires Wave-2 upstream GPU execution (`EXP-006..EXP-009`).
+
+---
+
+## Wave-2 Clean-Only Baseline & Remote `2 × T4` GPU Execution (Started 2026-11-13 ~10:41 UTC+7)
+
+### Clean-Only & Full-Train Baseline Audit (Verified Before Wave-2 Launch)
+- **Clean-Only Reference (`E19_no_F1`, excluding `MAGFiLO_extra` / `F1` cache)**:
+  - `E19_no_F1` (`Fold-0, 145 fr`): `PQ=0.4771 (TP=943, FP=312, FN=545)` vs `E19 (0.4856, TP=978, FP=323, FN=510)` — `-0.0085 PQ` (`-35 TP`).
+  - `E19_no_F1 + P6_core`: `PQ=0.4741 (TP=943, FP=328, FN=545)`.
+  - `E19_no_F1 + ms/P6 rescue` (`build_gap_submission.py` `super_ensemble_upgraded_stem`, verified bit-for-bit parity `0.48563` on full `E19`!): `PQ=0.47706 (rescue>=0.75..0.80: TP=943, FP=312, FN=545)` — passive `ms/P6` rescue adds `0 TP` on top of existing global detectors, proving genuine new recall/precision sources (`SAHI@1024`, `FRCNN-5F`, `seg_e4x`/`SAM2`/`S1E` + `ConvNeXt-Topo`) are mandatory.
+- **Full `707`-Photo 5-Fold OOF Baseline (`ms/s/main` on `/private/tmp/gt_records.pkl`)**:
+  - `ms alone`: `PQ=0.46155, SQ=0.69295, RQ=0.66607 (TP=5185, FP=2185, fn=3014)`
+  - `ms+s+main`: `PQ=0.46171, SQ=0.69306, RQ=0.66619 (TP=5167, FP=2146, fn=3032)`
+- **Test Distribution Audit (`results/submission.csv`, 180 Test images)**:
+  - `total_preds=1148`, `mean_per_photo=6.378`, `empty_photos=2`, `small_area_lt580_share=0.1315` (vs `~20%` GT `<580 px`), `median_area_px=1388.0`, `median_max_side=98.0`.
+  - Observatory means: `Bh: 7.12 (0.123 small), Ch: 7.27 (0.158 small), Lh: 6.09 (0.150 small), Mh: 5.69 (0.101 small), Th: 6.11 (0.139 small), Uh: 5.67 (0.098 small)`.
+
+### Active Wave-2 GPU Kernels (`2 × T4` Quota: 2/2 Running, 2 Queued)
+1. **`EXP-006` (`ajikajadeh/filseg-gap-exp006-seg-upgrade`) — `RUNNING`** (started ~10:41, est. ~4.3h):
+   - Phase 1: Parallel CPU `planes --procs 3` + `SAM2` (`g15/SAM2/best.pth`) over `ms, F3, P6, P4a, s, main` + `S1E` (`S1E_best.pth`) over `ms, s, main` (`707 OOF + 180 Test`).
+   - Phase 2: 5-fold `seg_e4x` (`--init e4 --trunc 0.4 --pad-hi 0.6 --lr 1e-4 --epochs 6`) across `folds 0..4`.
+   - Phase 3-4: Sharded `2 × T4` `e4x` & `e4x_g2` (`grow_windows` up to 2 rounds) + `SAM2_g2`/`S1E_g2` delta crops.
+2. **`EXP-007` (`ajikajadeh/filseg-gap-exp007-sahi1024`) — `RUNNING`** (started ~10:43, est. ~2.3-2.8h):
+   - 5-fold `YOLO11m` (`det_m1280_f0..4.pt` init) on overlapping `3×3` `1024×1024` native tiles (`starts=[0,512,1024]`, `min_vis=0.40` + 2 neg tiles/rec, 15 ep, `AdamW lr0=3e-4`), visibility-normalized cross-tile WBF (`cov_tiles`) + Stage-2 `seg_e4 (+g1), S1E, SAM2`.
+3. **`EXP-008a` (`ajikajadeh/filseg-gap-exp008a-frcnn5f`) — `QUEUED` (Compiled, ready for first free slot)**:
+   - Clean 5-fold `Faster R-CNN R50-FPN v2` @ `imgsz=1408` on all annotator records, dihedral aug, 3-flip WBF + Stage-2 `e4 (+g1), S1E, SAM2`.
+4. **`EXP-008b` (`ajikajadeh/filseg-gap-exp008b-convnext-topo`) — `QUEUED` (Compiled + `topo_loss` unit-tested, ready for second free slot)**:
+   - 5-fold `smp.UnetPlusPlus("tu-convnext_small.fb_in22k")` w/ `0.40*BCE + 0.35*Tversky(0.4,0.6) + 0.25*soft_clDice(6)` (`--trunc 0.4 --pad-hi 0.6`, 9 ep) across `ms, F3, P6, P4a, s, main`.
+
+---
+
+## Final Clean Competition Submissions (Deadline 2026-11-15 06:00 UTC / 13:00 WIB)
+- **Baseline Clean Improvement Chain (`submission_log.jsonl`, strictly leak-free `5F 707-OOF Nested Date-CV`)**:
+  - `EXP-006+007 Track-A Clean` (`exp006_007_tracka_clean.csv`, Kaggle `ref 58313893`): `PQ=0.46613`, Public LB `0.40`.
+  - `EXP-014b` (`exp014b_hyst_gbdt_clean.csv`, Kaggle `ref 58331699`): `PQ=0.46819`, `Sim80=0.47135`, Public LB `0.41`.
+  - `EXP-015a` (`exp015a_dense_clean.csv`, Kaggle `ref 58341800`): `PQ=0.47093`, `Sim80=0.47373`, Public LB `0.41`.
+  - `EXP-015a LogitH` (`exp015a_logit_clean.csv`, Kaggle `ref 58348277`): `PQ=0.47191` (`TP=5311, FP=2116, FN=2888, SQ=0.69422, RQ=0.67976`), `Sim80=0.47462`, Public LB `0.41`.
+  - **`EXP-015b LogitH + PurePhysViT 12%` (`exp015b_gv_pp12_clean.csv`, Kaggle `ref 58371665`, `SubmissionStatus.COMPLETE` at `05:58:03Z`)**:
+    - Formula: `0.55*GBDT + 0.33*ViT + 0.12*PurePhysViT` (`alpha=0.72`, `cons_p=[0.195, 0.265, 0.06, 0.232, 0.015, true]`).
+    - Nested 5-Fold Date-CV (`707` stems): `PQ=0.47196` (`SQ=0.69398, RQ=0.68008, TP=5322, FP=2130, FN=2877`), `Sim80=0.47460 ± 0.00169`, `mean_gain=+0.00005 vs exp015a` (`p=0.550`).
+    - Validation & Test Shift Audit: `0` validation errors, `1192` predictions across `180` test images (`mean=6.622`, `empty=3`, `lt580=0.1753`, `median_area=1188.0`), Public LB `0.41` (submitted `05:53:49Z`, scored `COMPLETE` before `06:00Z` cutoff).
+- **Sweep Variants Tested & Discarded (`5F Nested Date-CV` vs `0.47196`)**: `gv_pp08 (0.47130)`, `gv_pp10 (0.47186)`, `gv_pp15 (0.47036)`, `gv_pp12_gl2_05 (0.47061)`.
+- **Remote Compute Status at Deadline**:
+  - Colab A100 Stage-2 (`unet-mitb4` on `dl_enh`): aborted cleanly after verifying `ep=1/7` (`37.2m`) and `ep=2/7` (`44.4m`, `va_orig_dice=0.8086`) could not complete 5 folds before cutoff; runtime deleted (`0` active sessions, `39.39` compute units preserved).
+  - Kaggle `ajikajadeh/filseg-w5-exp013-det`: remained `RUNNING` past submission cutoff.

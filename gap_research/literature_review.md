@@ -32,3 +32,34 @@ This document builds directly on `research/literature_review.md` to map state-of
 - **Gaps**:
   1. Expanding top single-fold families (`Faster R-CNN R50-FPN v2` / `YOLO11-1664` / `YOLO11x` or `YOLO12` / `Mask2Former` or `SAHI` tiled detector / `SAM 2.1`) to full **5-fold ensembles** gives both $+25\%$ labeled supervision and variance reduction across Test dates.
   2. Evaluating **polar / radial contrast equalization** or **Center-to-Limb Variance Normalization** inside concentric solar rings ($r/R_{\odot} \in [0, 1]$) alongside dual-view **enhanced tri-plane input** for Faster R-CNN / YOLOv8-seg (remember Stage-1 `FRCNN` and `YOLO` in `filseg/detector.py`: check whether `FRCNN` used raw grayscale vs enhanced planes!).
+
+---
+
+## 6. Wave-4 Transformer, Hybrid SOTA & Topology-Preserving Literature (2024–2026)
+
+1. **Universal Masked-Attention & End-to-End Detection Transformers (Mask2Former, RT-DETR, RF-DETR, D-FINE, YOLO12)**:
+   - **Mask2Former** (Cheng et al., CVPR 2022; widely adopted in 2024–2026 thin-structure segmentation): Masked-attention Transformer decoder + multi-scale deformable pixel decoder retaining `1/4` resolution spatial details (`P2`). When paired with `1152x1152` overlapping tile inference (`256 px` seam overlap), eliminates Stage-1 box truncation and separates filaments from sunspots via global Swin-Base context.
+   - **RT-DETR** (Lv et al., CVPR 2024) & **D-FINE / RF-DETR** (2025–2026): IoU-aware query selection + hybrid Transformer encoders remove heuristic NMS bottlenecks; **YOLO12** (Tian et al., arXiv Feb 2025) introduces Area-Attention (`R-ELAN`) unifying CNN local inductive bias with Transformer long-range context for thin filaments (`rtdetr-x` + `yolo12x` Stage-1 + SAHI native-1x tiling).
+2. **Resource-Efficient Topology Preservation (`Skeleton Recall Loss` & `cbDice`, 2024)**:
+   - **Skeleton Recall Loss** (Kirchhoff et al., ECCV 2024): Precomputes CPU tubed ground-truth skeleton $Y_{ts} = D(S(Y)) \odot Y$ and minimizes $1 - \frac{\sum Y_{ts} \cdot P + \epsilon}{\sum Y_{ts} + \epsilon}$ alongside BCE, Tversky ($\alpha=0.40, \beta=0.60$), and `Soft-clDice`. Slashes compute overhead vs full differentiable GPU skeletonization while directly defending the $\mathrm{IoU} > 0.50$ fragmentation cliff on thin filaments.
+   - **cbDice** (Shi et al., MICCAI 2024): Complements `clDice` by weighting centerline and boundary radii uniformly across filament widths.
+3. **Self-Supervised Transformer Image Restoration & Train-Only Augmentation (`Restormer` & Object Copy-Paste)**:
+   - **Restormer** (Zamir et al., CVPR 2022; solar cross-band/seeing restoration 2024–2026): Linear-complexity Multi-Dconv Head Transposed Attention (`MDTA`) + Gated-Dconv Feed-Forward Network (`GDFN`) trained strictly on sharp in-fold `tr` frames with synthetic PSF seeing blur + haze restores fine filament absorption edges without fitting on validation/test frames.
+   - **Object-Aware Small-Filament Copy-Paste**: Strictly restricted to `folds != fold` training photos (`<1100 px` filaments pasted onto clean quiet-Sun regions) while holding out 100% original untouched competition images & labels for zero-leakage validation.
+
+---
+
+## 7. Verified Deep Browser Research: Latest Papers & Kaggle Writeups (Nov 2026)
+
+1. **MAGFiLO v1.0 Label Ceiling & Temporal CV Hygiene (`ameyypawar/filament-seg`, `Agnuxo1/solar-filament-segmentation-2026`, `arXiv:2610.34502`)**:
+   - Pairwise inter-annotator human agreement on MAGFiLO multi-drawn frames is only **`PQ = 0.343`** (`kappa = 0.47`), making calibration of threshold/score directly against single-annotator (`Sim_r80`) & consensus targets essential.
+   - Solar rotation (`~13 deg/day`) causes adjacent-day frames to share filaments, inflating non-grouped random-split Dice by `+0.10 to +0.25` (`arXiv:2610.34502`). All Gap-Research evaluations strictly use 5-fold date-grouped splits.
+   - Aggressive external contrast stretching / histogram equalization collapses U-Net Val Dice (`0.75-0.80 -> 0.50-0.60`) by corrupting soft skip-connection intensity gradients (`arXiv:2610.34502`); keep raw CLV-flattened grayscale in Channel 0 and feed Frangi/Sato/TopHat/CLAHE strictly as auxiliary channels or tabular features.
+2. **Bright-Halo Limb Rejection & Radial CLV Normalization (`filament_seg/disk.py`, `arXiv:2607.01095`)**:
+   - GONG frames exhibit a scattered-light halo annulus outside the photosphere limb (`35-150 px` overshoot under naive Otsu). Ray-casting inward from multi-seed disk estimates + sub-pixel gradient snapping + MAD-Kasa circle fit + `shrink=0.98` masking eliminates off-disk FPs for free.
+3. **Curvilinear & Topology-Preserving Literature (2024–2026)**:
+   - **WPRF (Widest-Path Reachability Fields, `arXiv:2607.07123`)**: Multi-scale Max-Min DP reachability + bottleneck hard-negative BCE improves Mask2Former Swin-T & SegFormer MiT-B1/B3 `clDice` (`+3.0 to +7.2 pp`) with zero extra inference overhead.
+   - **MORDEN (`arXiv:2607.24525v1`) & DenseCRF**: Replacing BatchNorm with **Instance/Group Normalization**, `5x5` stems, and full-res `2048px` DenseCRF edge crispness preserves local H-alpha filament contrast (`IoU 0.678 -> 0.696`).
+   - **Pavement-DETR (`MDPI Sensors 2025, 25(8):2426`)**: Channel-Spatial Shuffle + Conv3XC neck + PIoU v2 + Normalized Wasserstein Distance (NWD) boosts RT-DETR thin curvilinear detection (`mAP@0.5: 0.794 -> 0.871`) where standard box IoU drops under 1-px diagonal jitter.
+   - **HuBMAP Top-3 & SenNet 1st (`0.589` / `0.835` Private LB)**: Extra full-res stem (`GroupNorm/GELU`), multi-scale mask loss `2x-4x`, 2-stage Noisy->Clean/Consensus curriculum (`+4-6% LB`), quantile NMS/mask pruning, and warning that blind morphological mask dilation hurts hidden Private LB (`-0.062`) even when inflating Public LB.
+   - **PQ-Optimal Post-Processing (`ameyypawar`, `Agnuxo1`)**: Pre-sigmoid logit averaging, cross-detector cluster mean confidence (counting misses as `0`), **`open_radius=0`** (never erase thin barbs), **non-inflating gap bridging (`bridge_and_label`: dilate ONLY to group components, keep un-dilated mask pixels)**, exclusive greedy U-Net/dense-map pixel claiming (`grow=4..8 px`), and MWIS conflict graph optimization.

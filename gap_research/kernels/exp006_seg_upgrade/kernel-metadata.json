@@ -1,0 +1,33 @@
+{
+  "id": "ajikajadeh/filseg-gap-exp006-seg-upgrade",
+  "title": "filseg gap exp006 seg upgrade",
+  "code_file": "exp006_seg_upgrade.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "ajikajadeh/filseg-a100-code",
+    "ajikajadeh/filseg-tpu-code",
+    "ajikajadeh/filseg-ts-weights",
+    "ajikajadeh/filseg-a100-weights"
+  ],
+  "kernel_sources": [
+    "ajikajadeh/filseg-infer-ms",
+    "ajikajadeh/filseg-infer-s",
+    "ajikajadeh/filseg-infer-main",
+    "ajikajadeh/filseg-twostage-g15",
+    "ajikajadeh/filseg-twostage-g19",
+    "ajikajadeh/filseg-final-pipeline"
+  ],
+  "competition_sources": [
+    "filament-segmentation-2026"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

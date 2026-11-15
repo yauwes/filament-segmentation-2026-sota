@@ -1,0 +1,23 @@
+{
+  "id": "ajikajadeh/filseg-w5-exp012-dense",
+  "title": "filseg w5 exp012 dense",
+  "code_file": "exp012_kaggle_t4.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "ajikajadeh/filseg-gap-wave4-code"
+  ],
+  "kernel_sources": [],
+  "competition_sources": [
+    "filament-segmentation-2026"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

@@ -5,34 +5,33 @@ Solution to the [Solar Filament Segmentation Challenge 2026](https://www.kaggle.
 
 | | |
 |---|---|
-| 5-Fold Out-of-Fold PQ (707 training photos, 5 folds grouped by date) | **0.4636** (95% CI 0.4538–0.4716), SQ 0.6920, RQ 0.6699 |
+| 5-Fold Out-of-Fold PQ (707 training photos, 5 folds grouped by date) | **0.4720** (95% CI 0.4713–0.4779), SQ 0.6940, RQ 0.6801 (TP 5,322, FP 2,130, FN 2,877) |
 | Cross-Family Continuous Vote-Map Super-Ensemble (Fold-0 Validation PQ) | **0.4856** (SQ 0.6924, RQ 0.7013; **98.0%** held-out date split-half win rate) |
-| Public leaderboard PQ | **0.402** |
+| Public leaderboard PQ | **0.410** (`exp015b_gv_pp12_clean.csv` / `results/submission.csv`) |
 | Reference: one human annotator scored against another | PQ 0.3398 (SQ 0.6329, RQ 0.5369) |
-| Test inference | ~5.2 s per frame on one T4 (5-fold core) |
+| Public Git Repository | `https://github.com/yauwes/filament-segmentation-2026-sota` |
 
 ![pipeline](figures/pipeline.png)
 
 ## Method in five lines
 
-1. **Detect.** A YOLO11m box detector on the full frame (1280 px) proposes filaments and gives each a confidence.
+1. **Detect (Full-Disk + Multi-Scale SAHI).** A YOLO11m box detector on the full frame (1280 px) proposes filaments and gives each a confidence.
    It is trained on the boxes of *every* annotator record, so the confidence reflects how likely an annotator is to
-   mark the structure. A student copy (`m1280s`) is self-trained on 3,000 unlabeled GONG archive frames and merged via WBF (`ms`), complemented in the 12-stream super-ensemble by YOLO11m (`G1, A, B, P1, P4a`), Faster R-CNN ResNet50-FPNv2 (`F0, F1, F3`), and single-stage YOLOv8s-seg (`1536 px`).
-2. **Crop.** Each box is cut out of the 2048-px frame with 20% padding and resized to 512 px, so thin filaments
-   and barbs are segmented at (or above) native resolution.
-3. **Segment.** A 5-fold U-Net++ with an EfficientNet-B4 backbone (`e4`) outlines each cropped filament (with SAM 2.1 Hiera-B+ pixel averaging `avgSAM2` across six two-stage super-ensemble streams). Their input is three enhanced
-   planes (black top-hat, 101-px median flattened, Sato ridge) in robust disk MAD units (`filseg/enhance.py`).
-4. **Paint.** Instances are laid down in confidence order; a pixel belongs to the first instance that claims it,
-   so masks never overlap. Which instances are emitted (mask threshold, confidence floor, drop rule) is chosen
-   once, on out-of-fold PQ.
-5. **Cross-Family Continuous Vote-Map Super-Ensemble.** On Fold-0 and test, proposals across the 8 core members (`G1, A, B, P1, P4a, F0, F1, YOLOv8s-seg`) are clustered at $\tau_{\text{match}} = 0.40$ into a continuous confidence-weighted vote map $V_{\text{core}}(x,y) \in [0, 1]$, gated in the marginal zone $c \in [0.30, 0.32)$ by cross-family confirmation (`F3` + `ms`/`s`), and refined by injecting donor masks (`ms, s, main, F3`) with per-pixel denominator normalization before thresholding at $\tau_{\text{vote}} = 0.425$.
+   mark the structure. A student copy (`m1280s`) is self-trained on 3,000 unlabeled GONG archive frames and merged via WBF (`ms`), complemented by multi-scale Slicing Aided Hyper Inference (SAHI at $960^2, 1152^2, 1408^2$ tiles + $1536^2$ full-frame) across `RT-DETR-L`, `YOLO11x-seg`, `YOLO26x-seg`, and `Mask2Former Swin-Base` (`gap_research/`), plus YOLO11m (`G1, A, B, P1, P4a`), Faster R-CNN ResNet50-FPNv2 (`F0, F1, F3`), and single-stage YOLOv8s-seg (`1536 px`).
+2. **Crop & 5-Channel Spatial Prompts.** Each box is cut out of the 2048-px frame with context padding and resized to 512 px alongside explicit Gaussian spatial prompt channels ($C_4$: focal box indicator; $C_5$: union of intersecting peer boxes), so thin filaments and barbs are segmented at native resolution without merging adjacent ribbons.
+3. **Segment (Box-Prompted Refiners + $1536^2$ Dense Priors).** A 5-fold U-Net++ with an EfficientNet-B4 backbone (`e4`), `SAM 2.1 Hiera-B+` (`avgSAM2`), and 5-channel box-prompted refiners (`UPerNet-ConvNeXt-Small`, `SegFormer-MiT-B3`, `UNet-MiT-B4`, and dual-head boundary-supervised `FPN-ConvNeXt-Base`) are fused with $1536\times 1536$ full-frame dense `ConvNeXt-Small` and `MiT-B3` probability priors on our 3-channel solar-physics representation (`filseg/enhance.py` and `gap_research/solar_dl_enhance.py`).
+4. **Vision-Tabular Meta-Calibration & Coordinate-Ascent Paint (`PP12`).** Out-of-fold `LightGBM`, `CatBoost`, and `PurePhysViT` models trained on 90 geometric, topological, and multi-scale consensus features are ensembled with a 6-channel `VisionCropTransformer` (`ConvNeXt-Tiny`) on $128\times 128$ crops to predict calibrated $\widehat{\text{IoU}}$ and $\hat{p}_{\text{TP}}$, followed by nested coordinate-ascent post-processing (`PP12`: peer probability inhibition, adaptive thresholding, fragment pruning, and greedy non-overlapping painting).
+5. **Cross-Family Continuous Vote-Map Super-Ensemble.** Proposals across the core members (`G1, A, B, P1, P4a, F0, F1, YOLOv8s-seg`) are clustered at $\tau_{\text{match}} = 0.40$ into a continuous confidence-weighted vote map $V_{\text{core}}(x,y) \in [0, 1]$, gated in the marginal zone $c \in [0.30, 0.32)$ by cross-family confirmation (`F3` + `ms`/`s`), and refined by injecting donor masks (`ms, s, main, F3`) with per-pixel denominator normalization.
 
 Details, mathematical derivations, ablations, and failure cases: [`report/report.pdf`](report/report.pdf) (also mirrored at [`report/technical_report.pdf`](report/technical_report.pdf) and [`research/methodology.md`](research/methodology.md)).
 
 ## Reproduce the submission
 
 The notebook [`notebooks/pipeline.ipynb`](notebooks/pipeline.ipynb) runs the complete 5-fold pipeline (setup, pre-processing, optional
-training, inference with the weights in `weights/`, post-processing, evaluation, examples). To build the full 12-stream Cross-Family Continuous Vote-Map Super-Ensemble submission directly:
+training, inference with the weights in `weights/`, post-processing, evaluation, examples). To run the full 5-fold Vision-Tabular Meta-Calibration & `PP12` pipeline (`0.4720` OOF PQ, `0.410` Public LB) or the 12-stream Cross-Family Continuous Vote-Map Super-Ensemble directly:
+```bash
+python3 gap_research/scripts/exp015_wave5_fusion.py
+```
 
 ```bash
 pip install -r requirements.txt

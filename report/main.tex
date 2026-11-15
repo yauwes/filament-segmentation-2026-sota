@@ -33,7 +33,7 @@
 \email{\coauthoremail}
 
 \begin{abstract}
-We present our solution to the Solar Filament Segmentation Challenge~2026 for automated instance segmentation of solar filaments in $2048\times 2048$ GONG $\text{H-}\alpha$ observations under Panoptic Quality ($\mathrm{PQ}$) at $\mathrm{IoU} > 0.50$. To preserve thin $2\text{--}6$~px filament spines lost under downsampling while handling strong observer plurality across \multiphotos{} multi-record frames (inter-annotator $\mathrm{PQ} = \humanpq$), our approach decouples the pipeline into four stages: (1)~solar-disk MAD-standardized tri-plane enhancement (black top-hat, $101$-px median detrending, Sato curvilinear ridges); (2)~multi-family full-disk detection (\texttt{YOLO11m}, \texttt{Faster R-CNN} R50-FPN~v2, \texttt{YOLOv8s-seg}) trained on every individual annotator record plus fold-isolated Noisy-Student self-training on $3{,}000$ unlabeled GONG archive frames; (3)~$512\times 512$ instance-conditioned crop segmentation (\texttt{U-Net++} EfficientNet-B4 and fine-tuned \texttt{SAM~2.1} Hiera-B+) under BCE--Tversky loss; and (4)~Cross-Family Continuous Vote-Map Fusion with marginal confirmation calibration and greedy non-overlapping painting. Across $707$ training frames in date-grouped 5-fold cross-validation, our core model achieves $\mathrm{PQ} = \textbf{\oofpq}$ ($95\%$ CI \oofci; $\mathrm{SQ} = \oofsq$, $\mathrm{RQ} = \oofrq$). On held-out Fold~0 ($145$ frames), our 12-stream super-ensemble reaches $\mathrm{PQ} = \textbf{\superpq}$ ($\mathrm{TP} = \supertp$, $\mathrm{FP} = \superfp$, $\mathrm{FN} = \superfn$), winning \textbf{\superwin} of 200 date split-half bootstraps over our 8-model Mask-WBF baseline and attaining \textbf{\lbpq} on the public leaderboard. Code and weights are released at \href{https://github.com/yauwes/solar-filament-segmentation-2026}{github.com/yauwes/solar-filament-segmentation-2026}.
+We present our solution to the Solar Filament Segmentation Challenge~2026 for automated instance segmentation of solar filaments in $2048\times 2048$ GONG $\text{H-}\alpha$ observations under Panoptic Quality ($\mathrm{PQ}$) at $\mathrm{IoU} > 0.50$. To preserve thin $2\text{--}6$~px filament spines lost under downsampling while handling strong observer plurality across \multiphotos{} multi-record frames (inter-annotator $\mathrm{PQ} = \humanpq$), our approach decouples the pipeline into four stages: (1)~solar-disk MAD-standardized tri-plane and radial limb-darkening-corrected physics enhancement (black top-hat, $101$-px median detrending, and multi-scale Sato/Frangi curvilinear ridges); (2)~multi-family full-disk and multi-scale SAHI ($960^2, 1152^2, 1408^2$) detection (\texttt{YOLO11m/x-seg}, \texttt{Faster R-CNN} R50-FPN~v2, \texttt{RT-DETR-L}, \texttt{YOLO26x-seg}, \texttt{Mask2Former}) trained on individual annotator records plus fold-isolated Noisy-Student self-training on $3{,}000$ unlabeled GONG archive frames; (3)~$512\times 512$ 5-channel box-prompted crop segmentation (\texttt{U-Net++} EfficientNet-B4, \texttt{UPerNet-ConvNeXt-Small}, \texttt{SegFormer-MiT-B3}, \texttt{UNet-MiT-B4}, dual-head edge-supervised \texttt{FPN-ConvNeXt-Base}, and fine-tuned \texttt{SAM~2.1} Hiera-B+) fused with $1536^2$ full-frame dense priors; and (4)~Cross-Family Continuous Vote-Map Fusion with 90-feature Vision-Tabular Out-of-Fold Meta-Calibration (\texttt{LightGBM}, \texttt{CatBoost}, \texttt{PurePhysViT}, and 6-channel \texttt{VisionCropTransformer}) and nested coordinate-ascent painting (\texttt{PP12}). Across $707$ training frames in date-grouped 5-fold cross-validation, our full 5-fold ensemble achieves $\mathrm{PQ} = \textbf{\oofpq}$ ($95\%$ CI \oofci; $\mathrm{SQ} = \oofsq$, $\mathrm{RQ} = \oofrq$; $\mathrm{TP} = \ooftp$, $\mathrm{FP} = \ooffp$, $\mathrm{FN} = \ooffn$). On held-out Fold~0 ($145$ frames), our 12-stream super-ensemble reaches $\mathrm{PQ} = \textbf{\superpq}$ ($\mathrm{TP} = \supertp$, $\mathrm{FP} = \superfp$, $\mathrm{FN} = \superfn$), winning \textbf{\superwin} of 200 date split-half bootstraps and attaining \textbf{\lbpq} on the official Kaggle public leaderboard. Code and weights are released at \href{https://github.com/yauwes/filament-segmentation-2026-sota}{github.com/yauwes/filament-segmentation-2026-sota}.
 \end{abstract}
 
 \maketitle
@@ -91,7 +91,7 @@ where $C_1$ is a disk black top-hat ($r{=}7$~px closing $\bullet B_7$), $C_2$ su
 To eliminate solar-rotation leakage, \texttt{filseg/data.py} partitions the $707$ training frames by 8-digit observation date (\texttt{YYYYMMDD}) into 5 disjoint folds. Rather than merging multi-annotator masks via union or intersection, Stage~1 trains on all $1{,}154$ individual records: under binary objectness loss across $M_i$ observers where $k$ mark box $b$, expected confidence converges to $\hat{p}^\star = k/M_i$, naturally calibrating scores to human consensus.
 
 \subsection{Stage 1: Multi-Family Detection \& Self-Training}
-Our reproducible 5-fold core (\texttt{detector.py}) trains YOLO11m \cite{yolo11} at $1280\times 1280$ on every annotator record per fold (\texttt{main}, AdamW, $50$ epochs). Via fold-isolated Noisy-Student self-training \cite{xie2020self,lee2013pseudo}, each fold teacher generates 3-flip Weighted Boxes Fusion (WBF \cite{solovyev2021weighted}, $\mathrm{conf}\ge 0.25$) pseudo-labels on $3{,}000$ unlabeled GONG archive frames to train student \texttt{s}, fusing with \texttt{main} via WBF (\texttt{ms}, OOF $\mathrm{PQ}=\oofpq$).
+Our reproducible 5-fold core (\texttt{detector.py}) trains YOLO11m \cite{yolo11} at $1280\times 1280$ on every annotator record per fold (\texttt{main}, AdamW, $50$ epochs). Via fold-isolated Noisy-Student self-training \cite{xie2020self,lee2013pseudo}, each fold teacher generates 3-flip Weighted Boxes Fusion (WBF \cite{solovyev2021weighted}, $\mathrm{conf}\ge 0.25$) pseudo-labels on $3{,}000$ unlabeled GONG archive frames to train student \texttt{s}, fusing with \texttt{main} via WBF (\texttt{ms}, OOF $\mathrm{PQ}=\coreoofpq$). To eliminate tile-boundary fragmentation and capture small high-latitude filaments across all 5 folds, we further integrate Slicing Aided Hyper Inference (SAHI \cite{akyon2022sahi}) across three tile scales ($960^2$ $3\times 3$, $1152^2$ $3\times 3$, and $1408^2$ $2\times 2$) plus full-frame $1536^2$ detection with \texttt{RT-DETR-L} \cite{zhao2024detrs}, \texttt{YOLO11x-seg}, \texttt{YOLO26x-seg} \cite{jocher2023ultralytics}, and \texttt{Mask2Former Swin-Base} \cite{cheng2022masked}, consolidated via Connected-Component WBF.
 
 Our 12-stream super-ensemble combines: (i)~five YOLO11m two-stage detectors across $1280\text{--}1664$~px teachers (\texttt{G1, A, B}) and GONG students (\texttt{P1, P4a}); (ii)~three Faster R-CNN R50-FPN~v2 detectors \cite{ren2015faster,he2016deep} (\texttt{F0} teacher; \texttt{F1, F3} students); (iii)~single-stage YOLOv8s-seg ($1536$~px, \texttt{offset=-1}); and (iv)~three 5-fold YOLO11m streams (\texttt{ms, s, main}).
 
@@ -103,9 +103,9 @@ Following \texttt{filseg/segmenter.py}, each detected box $b$ is cropped with $\
   T_{\alpha,\beta}(p,y) &= \frac{\sum_i p_i y_i + \epsilon}{\sum_i p_i y_i + \alpha\sum_i p_i(1{-}y_i) + \beta\sum_i (1{-}p_i)y_i + \epsilon}.
 \end{aligned}
 \end{equation}
-On six core two-stage members (\texttt{G1, A, B, P1, F0, F1}), U-Net++/EffNet-B4 (\texttt{S1}/\texttt{S1E}) crop probabilities are averaged box-by-box with a box-prompted fine-tuned SAM~2.1 Hiera-B+ adapter (\texttt{avgSAM2}) \cite{ravi2024sam2}.
+On six core two-stage members (\texttt{G1, A, B, P1, F0, F1}), U-Net++/EffNet-B4 (\texttt{S1}/\texttt{S1E}) crop probabilities are averaged box-by-box with a box-prompted fine-tuned SAM~2.1 Hiera-B+ adapter (\texttt{avgSAM2}) \cite{ravi2024sam2}. In our 5-fold Wave~4--5 expansion (\texttt{gap\_\allowbreak research/}), we augment each $512\times 512$ crop with two explicit Gaussian spatial prompt channels ($C_4$: focal box indicator; $C_5$: union of intersecting peer boxes) and train four 5-channel refiners (\texttt{UPerNet-\allowbreak ConvNeXt-\allowbreak Small} \cite{liu2022convnet}, \texttt{SegFormer-\allowbreak MiT-B3} \cite{xie2021segformer}, \texttt{UNet-\allowbreak MiT-B4}, and dual-head boundary-supervised \texttt{FPN-\allowbreak ConvNeXt-\allowbreak Base}) blended with $1536\times 1536$ full-frame dense \texttt{ConvNeXt-\allowbreak Small} and \texttt{MiT-B3} probability priors.
 
-\subsection{Continuous Vote-Map Fusion \& Painting}
+\subsection{Continuous Vote-Map Fusion, Meta-Calibration \& Painting}
 Suppose a marginal candidate converts $1\,\mathrm{FN}\to 1\,\mathrm{TP}$ with probability $p$ and expected IoU $\overline{\mathrm{IoU}}_{\mathrm{TP}}\approx 0.692$, or adds $1\,\mathrm{FP}$ with probability $1-p$. In either outcome the PQ denominator $D$ in Eq.~\eqref{eq:pq} grows by $+0.5$, so emitting the candidate raises expected PQ iff
 \begin{equation}\label{eq:breakeven}
 \begin{aligned}
@@ -115,15 +115,15 @@ Suppose a marginal candidate converts $1\,\mathrm{FN}\to 1\,\mathrm{TP}$ with pr
 \end{aligned}
 \end{equation}
 
-Our fusion steps (\texttt{scripts/build\_\allowbreak super\_\allowbreak submission.py}) apply Eq.~\eqref{eq:breakeven} as follows:
+Our fusion and meta-calibration steps (\texttt{scripts/build\_\allowbreak super\_\allowbreak submission.py} and \texttt{gap\_\allowbreak research/scripts/exp015\_\allowbreak wave5\_\allowbreak fusion.py}) apply Eq.~\eqref{eq:breakeven} as follows:
 \begin{enumerate}
   \item \textbf{Continuous Core Vote Map.} Proposals from the 8 core members (\texttt{G1, A, B, P1, P4a, F0, F1}, YOLOv8s-seg) cluster greedily at mask $\mathrm{IoU} \ge 0.40$, retaining the confidence-weighted vote map $V_{\mathrm{core}}(x,y) = \bar{M}_{\mathcal{C}}(x,y) \in [0,1]$ (mean over member masks $M_m$ weighted by confidence $c_m$) and cluster score $c = \bar{c}_{\mathcal{C}} \cdot \min(|\mathcal{C}|, 8)/8$.
-  \item \textbf{Cross-Family Confirmation Calibration.} In the marginal band $c \in [0.30, 0.32)$, unconfirmed clusters show only $28.6\%$ precision ($4/14 < 35.0\%$), whereas clusters confirmed by Faster R-CNN student \texttt{F3} ($\mathrm{IoU} \ge 0.40$, Prec $0.714$) and 5-fold \texttt{ms} or \texttt{s} ($\mathrm{IoU} \ge 0.40$, Prec $0.703$) reach $75.0\%$ ($3/4$). Confirming clusters earn $+0.02$ against floor $c_{\min} = 0.32$.
-  \item \textbf{Continuous Donor Injection \& Painting.} Matched donor masks ($\mathrm{IoU}\ge 0.30$) with weights $w_{\mathrm{ms}}{=}0.18$, $w_{\mathrm{s}}{=}0.18$, $w_{\mathrm{main}}{=}0.12$, and $w_{\mathrm{F3}}{=}0.06$ refine $V_{\mathrm{core}}$ via 2D per-pixel weights:
+  \item \textbf{Cross-Family \& Vision-Tabular Meta-Calibration.} In the marginal band $c \in [0.30, 0.32)$, unconfirmed clusters show only $28.6\%$ precision ($4/14 < 35.0\%$), whereas clusters confirmed by Faster R-CNN student \texttt{F3} ($\mathrm{IoU} \ge 0.40$, Prec $0.714$) and 5-fold \texttt{ms} or \texttt{s} ($\mathrm{IoU} \ge 0.40$, Prec $0.703$) reach $75.0\%$ ($3/4$). Across all 5 folds, we further train leak-free out-of-fold \texttt{LightGBM} \cite{ke2017lightgbm}, \texttt{CatBoost} \cite{prokhorenkova2018catboost}, and \texttt{PurePhysViT} models over 90 geometric, topological, and multi-scale consensus features alongside a 6-channel \texttt{VisionCropTransformer} (\texttt{ConvNeXt-Tiny}) on $128\times 128$ crops to predict calibrated $\widehat{\mathrm{IoU}}$ and $\hat{p}_{\mathrm{TP}} = P(\mathrm{IoU} > 0.50)$.
+  \item \textbf{Continuous Donor Injection \& Coordinate-Ascent Painting (\texttt{PP12}).} Matched donor masks ($\mathrm{IoU}\ge 0.30$) with weights $w_{\mathrm{ms}}{=}0.18$, $w_{\mathrm{s}}{=}0.18$, $w_{\mathrm{main}}{=}0.12$, and $w_{\mathrm{F3}}{=}0.06$ refine $V_{\mathrm{core}}$ via 2D per-pixel weights:
   \begin{equation}\label{eq:vsuper}
     V_{\mathrm{super}}(x,y) = \frac{V_{\mathrm{core}}(x,y) + \sum_{k\in\mathcal{D}} w_k M_k(x,y)\,\mathbb{I}[(x,y)\in b_k]}{1 + \sum_{k\in\mathcal{D}} w_k\,\mathbb{I}[(x,y)\in b_k]},
   \end{equation}
-  thresholded at $\tau_{\mathrm{vote}} = 0.425$. Surviving masks paint greedily onto the $2048^2$ canvas in descending confidence order (\texttt{filseg/postprocess.py}), retained iff their unclaimed portion covers $\ge 70\%$ of mask area and $\ge 100$~px.
+  followed by nested coordinate-ascent post-processing (\texttt{PP12}): peer probability inhibition, adaptive thresholding, fragment pruning, and greedy non-overlapping painting onto the $2048^2$ canvas (\texttt{filseg/postprocess.py}).
 \end{enumerate}
 
 % ==================================== %
@@ -139,17 +139,17 @@ Our fusion steps (\texttt{scripts/build\_\allowbreak super\_\allowbreak submissi
 \end{figure*}
 
 \subsection{5-Fold Cross-Validation and Core Ablations}
-Table~\ref{tab:oof} reports date-grouped 5-fold OOF metrics across all $707$ training frames ($8{,}199$ pooled GT instances). Compared to inter-annotator agreement ($\mathrm{PQ}=\humanpq$), our base 5-fold \texttt{YOLO11m+U-Net++} (\texttt{main}) achieves $0.4582$. Dropping segmenter flip TTA ($-0.0016$), detector flip TTA ($-0.0050$), or widening crop padding to $\rho=0.35$ ($-0.0146$) consistently degrades PQ. Adding GONG Noisy-Student self-training (\texttt{s}) and WBF box fusion (\texttt{ms}, threshold \texttt{0.70}, conf \texttt{0.275}, drop \texttt{0.95}) lifts OOF to $\mathbf{\oofpq}$ ($95\%$ date-bootstrap CI $\oofci$, $\mathrm{SQ}=\oofsq$, $\mathrm{RQ}=\oofrq$; uniform across all five folds, Fig.~\ref{fig:eval}b).
+Table~\ref{tab:oof} reports date-grouped 5-fold OOF metrics across all $707$ training frames ($8{,}199$ pooled GT instances). Compared to inter-annotator agreement ($\mathrm{PQ}=\humanpq$), our base 5-fold \texttt{YOLO11m+U-Net++} (\texttt{main}) achieves $0.4582$. Adding GONG Noisy-Student self-training (\texttt{s}) and WBF box fusion (\texttt{ms}) lifts OOF to $\coreoofpq$. Incorporating multi-scale SAHI ($960/1152/1408$) with $1536^2$ full-frame dense physics priors and 5-channel box-prompted refiners (\texttt{ConvNeXt-\allowbreak Small/Base} + \texttt{MiT-B3/B4}) advances 5-fold OOF PQ to $\wfourpq$, and our 90-feature Vision-Tabular Meta-Calibration (\texttt{LightGBM} + \texttt{CatBoost} + \texttt{PurePhysViT} + \texttt{Vision\allowbreak Crop\allowbreak Transformer} + \texttt{PP12}) reaches $\mathbf{\oofpq}$ ($1000\times$ bootstrap CI $\oofci$, $\mathrm{SQ}=\oofsq$, $\mathrm{RQ}=\oofrq$) and $\mathbf{\lbpq}$ on the public leaderboard.
 
 \begin{table}[t]
   \centering
   \caption{5-Fold OOF evaluation across 707 training frames (8,199 pooled GT).}
   \label{tab:oof}
   \footnotesize
-  \setlength{\tabcolsep}{3pt}
+  \setlength{\tabcolsep}{2.4pt}
   \begin{tabular}{@{}lcccccc@{}}
     \toprule
-    Model / Ablation & PQ & SQ & RQ & TP & FP & FN \\
+    Model / Ablation (5-Fold Date-CV) & PQ & SQ & RQ & TP & FP & FN \\
     \midrule
     Human Inter-Annotator (\multiphotos{} fr.) & \humanpq & \humansq & \humanrq & -- & -- & -- \\
     Full-Frame U-Net + CC & 0.389\phantom{0} & 0.668\phantom{0} & 0.582\phantom{0} & -- & -- & -- \\
@@ -158,41 +158,44 @@ Table~\ref{tab:oof} reports date-grouped 5-fold OOF metrics across all $707$ tra
     \texttt{main}, w/o Det Flip TTA & 0.4532 & -- & -- & -- & -- & -- \\
     \texttt{main}, w/o Seg Flip TTA & 0.4566 & -- & -- & -- & -- & -- \\
     Teacher \texttt{main} (YOLO11m+\texttt{e4}) & 0.4582 & 0.6911 & 0.6630 & 5{,}263 & 2{,}414 & 2{,}936 \\
-    Student \texttt{s} (+3k GONG) & 0.4599 & \textbf{0.6926} & 0.6641 & \textbf{5{,}339} & 2{,}541 & \textbf{2{,}860} \\
-    \textbf{Teacher+Student \texttt{ms}+\texttt{e4}} & \textbf{\oofpq} & \oofsq & \textbf{\oofrq} & \ooftp & \textbf{\ooffp} & \ooffn \\
+    Student \texttt{s} (+3k GONG) & 0.4599 & 0.6926 & 0.6641 & \textbf{5{,}339} & 2{,}541 & \textbf{2{,}860} \\
+    Teacher+Student \texttt{ms}+\texttt{e4} & \coreoofpq & 0.6920 & 0.6699 & 5{,}288 & 2{,}301 & 2{,}911 \\
+    + Multi-Scale SAHI \& $1536^2$ Priors & \wfourpq & 0.6939 & 0.6738 & 5{,}301 & 2{,}230 & 2{,}898 \\
+    \textbf{+ Vision-Tabular Calib.\ \& \texttt{PP12}} & \textbf{\oofpq} & \textbf{\oofsq} & \textbf{\oofrq} & \ooftp & \textbf{\ooffp} & \ooffn \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{Super-Ensemble \& Bootstrap Verification}
-Table~\ref{tab:super} summarizes Fold-0 ($145$ frames, $1{,}488$ pooled GT) and Public LB progression. Direct \texttt{YOLOv8s-seg} scores $0.4270$ ($\mathrm{LB}\;0.37$), while top individual two-stage members reach $0.4619\text{--}0.4650$. Mask-WBF fusion across the 8 core streams (\texttt{G17}) jumps to $0.4820$, confirmation calibration adds $+0.0019$, and continuous donor injection yields $\mathbf{\superpq}$ ($\mathrm{TP}=\supertp, \mathrm{FP}=\superfp, \mathrm{FN}=\superfn$), removing $20$ FPs at $0$ TP loss vs.\ \texttt{G17}. Across $200$ date split-half bootstraps on Fold~0, it beats \texttt{G17} on \textbf{\superwin} of splits (mean $+0.0038$, 5th pct $+0.0008$) and achieves \textbf{\lbpq} Public LB ($180$ test frames, $1{,}148$ instances, $6.38$/frame).
+Table~\ref{tab:super} summarizes Fold-0 ($145$ frames, $1{,}488$ pooled GT) and Public LB progression. Direct \texttt{YOLOv8s-seg} scores $0.4270$ ($\mathrm{LB}\;0.37$), while top individual two-stage members reach $0.4619\text{--}0.4650$. Mask-WBF fusion across the 8 core streams (\texttt{G17}) jumps to $0.4820$ ($\mathrm{LB}\;0.402$), confirmation calibration and continuous donor injection yield $\mathbf{\superpq}$ on Fold~0, and our full 5-fold Vision-Tabular Meta-Calibrated ensemble (\texttt{exp015b\_\allowbreak gv\_\allowbreak pp12}) achieves \textbf{\lbpq} on the official Kaggle public leaderboard ($180$ test frames, $1{,}192$ instances, $6.62$/frame).
 
 \begin{table}[t]
   \centering
   \caption{Fold-0 (145 frames, 1,488 pooled GT) and Public LB progression.}
   \label{tab:super}
   \footnotesize
-  \setlength{\tabcolsep}{2.8pt}
+  \setlength{\tabcolsep}{2.6pt}
   \begin{tabular}{@{}lcccccr@{}}
     \toprule
-    Configuration (Fold~0) & PQ & SQ & RQ & TP & FP & LB \\
+    Configuration & PQ & SQ & RQ & TP & FP & LB \\
     \midrule
     YOLOv8s-seg $1536$ (\texttt{offset=-1}) & 0.4270 & 0.6711 & 0.6364 & 875 & 387 & 0.37\phantom{0} \\
     2-Stage \texttt{G1} (\texttt{YOLO11m+avgSAM2}) & 0.4491 & 0.6898 & 0.6511 & 962 & 505 & -- \\
     Top Single 2-Stage (\texttt{P1}) & 0.4650 & 0.6937 & 0.6703 & 973 & 442 & -- \\
     \midrule
-    8-Model Core Mask-WBF (\texttt{G17}) & 0.4820 & 0.6922 & 0.6963 & \supertp & 343 & \lbpq \\
+    8-Model Core Mask-WBF (\texttt{G17}) & 0.4820 & 0.6922 & 0.6963 & \supertp & 343 & 0.402 \\
     Tuned Mask-WBF ($0.40/0.40/0.30$) & 0.4830 & 0.6932 & 0.6968 & 979 & 343 & -- \\
-    + Confirm Calib. ($c_{\min}{=}0.32$) & 0.4839 & \textbf{0.6933} & 0.6980 & 974 & 329 & -- \\
-    \textbf{Full Continuous Vote-Map Sup.} & \textbf{\superpq} & \supersq & \textbf{\superrq} & \textbf{\supertp} & \textbf{\superfp} & \textbf{\lbpq} \\
+    + Confirm Calib. ($c_{\min}{=}0.32$) & 0.4839 & 0.6933 & 0.6980 & 974 & 329 & -- \\
+    Full Continuous Vote-Map Sup.\ (F0) & \textbf{\superpq} & \supersq & \textbf{\superrq} & \textbf{\supertp} & \textbf{\superfp} & 0.402 \\
+    \textbf{5F Vision-Tabular + \texttt{PP12} (707 fr.)} & \textbf{\oofpq} & \textbf{\oofsq} & \textbf{\oofrq} & \ooftp & \ooffp & \textbf{\lbpq} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{Diagnostics, Failure Modes, and Negative Tests}
-Figure~\ref{fig:eval} shows model pair IoU averages $0.6109$ (Dice $0.7395$) vs.\ $0.5168$ (Dice $0.6600$) for human annotators, with $83.4\%$ predicted and $78.0\%$ GT 1-to-1 matches ($2.0\%$ splits, $2.7\%$ merges). Remaining Fold-0 errors concentrate on ambiguous faint fibrils ($\mathrm{FP}+\mathrm{FN}$) and fragmented broad filaments near the hard metric threshold ($106$ predictions fall in the $0.35 \le \mathrm{IoU} \le 0.50$ near-miss band). In controlled paired Fold-0 experiments, refitting on all 5 folds, alternative crop backbones (DINOv3, SegFormer, DeepLab, HRNet), clDice loss, and RT-DETR failed to improve over our deployed ensemble and were excluded.
+Figure~\ref{fig:eval} shows model pair IoU averages $0.6109$ (Dice $0.7395$) vs.\ $0.5168$ (Dice $0.6600$) for human annotators, with $83.4\%$ predicted and $78.0\%$ GT 1-to-1 matches ($2.0\%$ splits, $2.7\%$ merges). Remaining errors concentrate on ambiguous faint fibrils ($\mathrm{FP}+\mathrm{FN}$) and fragmented broad filaments near the hard metric threshold ($0.35 \le \mathrm{IoU} \le 0.50$).
 
-Overall, native-resolution crop segmentation ($+0.038$~PQ over single-stage YOLOv8s-seg), GONG self-training ($+0.0054$~OOF PQ from \texttt{main} to \texttt{ms}), cross-family box diversity ($+0.0170$~PQ from best single model to Mask-WBF), and continuous vote-map donor refinement with confirmation gating ($+0.0036$~PQ over \texttt{G17}) act additively to raise performance from inter-human agreement (\humanpq) to \superpq{} validation PQ and \lbpq{} Public LB. All code, 5-fold weights, and validated test predictions (\texttt{results/submission.csv}) are reproduced via \texttt{run.py} and our super-ensemble script (\texttt{scripts/\allowbreak build\_\allowbreak super\_\allowbreak submission.py}).
+Overall, native-resolution 5-channel box-prompted crop segmentation, multi-scale SAHI ($960/1152/1408$) and $1536^2$ full-frame dense priors, GONG self-training, and 90-feature Vision-Tabular Meta-Calibration with coordinate-ascent painting (\texttt{PP12}) act additively to raise performance from inter-human agreement (\humanpq) to \oofpq{} 5-fold OOF PQ (\superpq{} on Fold~0) and \lbpq{} Public LB. All code, configs, 5-fold splits, and validated test predictions (\texttt{results/submission.csv}) are publicly accessible at \href{https://github.com/yauwes/filament-segmentation-2026-sota}{github.com/yauwes/filament-segmentation-2026-sota} and reproduced via \texttt{run.py} and \texttt{gap\_\allowbreak research/\allowbreak scripts/\allowbreak exp015\_\allowbreak wave5\_\allowbreak fusion.py}.
 
 % ==================================== %
 % 4. ACKNOWLEDGMENT %

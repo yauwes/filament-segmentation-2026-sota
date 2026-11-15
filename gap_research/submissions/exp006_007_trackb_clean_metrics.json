@@ -1,0 +1,70 @@
+{
+  "val": {
+    "n_stems": 145,
+    "pq": 0.48637,
+    "sq": 0.69474,
+    "rq": 0.70007,
+    "tp": 992,
+    "fp": 354,
+    "fn": 496,
+    "vs_e19_delta": 0.0008,
+    "vs_e19_ci95": [
+      -0.00533,
+      0.00723
+    ],
+    "vs_e19_p_win": 0.575,
+    "nested_date_fold_wins": "2/5"
+  },
+  "bins": {
+    "lt580": {
+      "pq": 0.31381,
+      "tp": 119,
+      "fp": 117,
+      "fn": 181
+    },
+    "b580_2k": {
+      "pq": 0.43436,
+      "tp": 451,
+      "fp": 253,
+      "fn": 302
+    },
+    "ge2k": {
+      "pq": 0.46037,
+      "tp": 276,
+      "fp": 130,
+      "fn": 159
+    }
+  },
+  "shift": {
+    "csv": "filament-segmentation-2026/gap_research/submissions/exp006_007_trackb_clean.csv",
+    "test_images": 180,
+    "total_preds": 1203,
+    "mean_per_photo": 6.683,
+    "empty_photos": 3,
+    "small_area_lt580_share": 0.1604,
+    "median_area_px": 1237.0,
+    "median_max_side": 93.0,
+    "observatory_means": {
+      "Bh": 7.48,
+      "Ch": 7.7,
+      "Lh": 6.29,
+      "Mh": 5.77,
+      "Th": 6.52,
+      "Uh": 6.0
+    },
+    "observatory_small_area_share": {
+      "Bh": 0.15,
+      "Ch": 0.193,
+      "Lh": 0.159,
+      "Mh": 0.133,
+      "Th": 0.176,
+      "Uh": 0.136
+    },
+    "ref_csv": "/Users/erwinqodariyah/Claude Project/Kaggle/filament-segmentation-2026/results/submission.csv",
+    "ref_total_preds": 1148,
+    "ref_mean_per_photo": 6.378,
+    "ref_small_area_lt580_share": 0.1315,
+    "delta_preds": 55,
+    "delta_small_area_share": 0.0289
+  }
+}

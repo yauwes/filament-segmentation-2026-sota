@@ -1,0 +1,22 @@
+{
+  "id": "ajikajadeh/filseg-gap-exp009a-enh-yolo",
+  "title": "filseg gap exp009a enh yolo",
+  "code_file": "exp009a_enh_yolo.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "ajikajadeh/filseg-a100-code",
+    "ajikajadeh/filseg-a100-weights",
+    "ajikajadeh/filseg-tpu-code",
+    "ajikajadeh/filseg-ts-weights"
+  ],
+  "competition_sources": [
+    "filament-segmentation-2026"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

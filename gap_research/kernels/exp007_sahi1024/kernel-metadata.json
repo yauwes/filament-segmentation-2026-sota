@@ -1,0 +1,28 @@
+{
+  "id": "ajikajadeh/filseg-gap-exp007-sahi1024",
+  "title": "filseg gap exp007 sahi1024",
+  "code_file": "exp007_sahi1024.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "keywords": [
+    "gpu"
+  ],
+  "dataset_sources": [
+    "ajikajadeh/filseg-a100-code",
+    "ajikajadeh/filseg-tpu-code",
+    "ajikajadeh/filseg-ts-weights",
+    "ajikajadeh/filseg-a100-weights"
+  ],
+  "kernel_sources": [
+    "ajikajadeh/filseg-twostage-g15"
+  ],
+  "competition_sources": [
+    "filament-segmentation-2026"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}

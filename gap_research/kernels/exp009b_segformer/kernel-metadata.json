@@ -1,0 +1,26 @@
+{
+  "id": "ajikajadeh/filseg-gap-exp009b-segformer",
+  "title": "filseg gap exp009b segformer",
+  "code_file": "exp009b_segformer.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "ajikajadeh/filseg-a100-code",
+    "ajikajadeh/filseg-tpu-code"
+  ],
+  "competition_sources": [
+    "filament-segmentation-2026"
+  ],
+  "kernel_sources": [
+    "ajikajadeh/filseg-infer-ms",
+    "ajikajadeh/filseg-infer-s",
+    "ajikajadeh/filseg-infer-main",
+    "ajikajadeh/filseg-twostage-g19",
+    "ajikajadeh/filseg-final-pipeline"
+  ],
+  "model_sources": []
+}

@@ -11,3 +11,4 @@ report/*.bbl
 report/*.blg
 report/build/
 yolo11*.pt
+catboost_info/

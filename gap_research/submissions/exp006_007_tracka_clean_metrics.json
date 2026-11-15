@@ -1,0 +1,34 @@
+{
+  "shift": {
+    "csv": "filament-segmentation-2026/gap_research/submissions/exp006_007_tracka_clean.csv",
+    "test_images": 180,
+    "total_preds": 1224,
+    "mean_per_photo": 6.8,
+    "empty_photos": 3,
+    "small_area_lt580_share": 0.1855,
+    "median_area_px": 1183.5,
+    "median_max_side": 91.5,
+    "observatory_means": {
+      "Bh": 7.64,
+      "Ch": 7.79,
+      "Lh": 6.38,
+      "Mh": 6.15,
+      "Th": 6.52,
+      "Uh": 6.0
+    },
+    "observatory_small_area_share": {
+      "Bh": 0.167,
+      "Ch": 0.218,
+      "Lh": 0.189,
+      "Mh": 0.181,
+      "Th": 0.21,
+      "Uh": 0.136
+    },
+    "ref_csv": "/Users/erwinqodariyah/Claude Project/Kaggle/filament-segmentation-2026/results/submission.csv",
+    "ref_total_preds": 1148,
+    "ref_mean_per_photo": 6.378,
+    "ref_small_area_lt580_share": 0.1315,
+    "delta_preds": 76,
+    "delta_small_area_share": 0.0539
+  }
+}
