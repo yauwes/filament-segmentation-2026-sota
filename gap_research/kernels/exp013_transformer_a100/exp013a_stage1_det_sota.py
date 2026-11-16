@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -699,6 +700,16 @@ def run_driver(arch: str, scenario: str, epochs: int, patience: int, smoke_fold0
     for th in ts:
         th.join()
     assert not errs, errs
+
+    safe_arch = arch.replace("-", "_")
+    base_name = f"exp013_{safe_arch}_{scenario}{tag_sfx}"
+    w_dir = work_dir / "weights"
+    if w_dir.exists() and any(w_dir.glob("*.pt")):
+        wt_tar = Path(f"/kaggle/working/{base_name}_weights.tar.gz")
+        wt_tar.parent.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(wt_tar, "w:gz") as tf:
+            tf.add(w_dir, arcname="weights")
+        print(f"[packed] {wt_tar} ({wt_tar.stat().st_size / 1e6:.1f} MB)", flush=True)
 
     boxes_dir = work_dir / f"boxes_{arch}_{scenario}{tag_sfx}"
     s1_inst_dir = (work_dir / f"s1_inst_{arch}_{scenario}{tag_sfx}") if arch.endswith("-seg") else None

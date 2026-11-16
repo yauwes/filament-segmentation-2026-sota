@@ -115,17 +115,18 @@
 
 ---
 
-## Final Clean Competition Submissions (Deadline 2026-11-15 06:00 UTC / 13:00 WIB)
+## Final Clean Competition Submissions & Wave-5 Summary
 - **Baseline Clean Improvement Chain (`submission_log.jsonl`, strictly leak-free `5F 707-OOF Nested Date-CV`)**:
   - `EXP-006+007 Track-A Clean` (`exp006_007_tracka_clean.csv`, Kaggle `ref 58313893`): `PQ=0.46613`, Public LB `0.40`.
   - `EXP-014b` (`exp014b_hyst_gbdt_clean.csv`, Kaggle `ref 58331699`): `PQ=0.46819`, `Sim80=0.47135`, Public LB `0.41`.
   - `EXP-015a` (`exp015a_dense_clean.csv`, Kaggle `ref 58341800`): `PQ=0.47093`, `Sim80=0.47373`, Public LB `0.41`.
   - `EXP-015a LogitH` (`exp015a_logit_clean.csv`, Kaggle `ref 58348277`): `PQ=0.47191` (`TP=5311, FP=2116, FN=2888, SQ=0.69422, RQ=0.67976`), `Sim80=0.47462`, Public LB `0.41`.
-  - **`EXP-015b LogitH + PurePhysViT 12%` (`exp015b_gv_pp12_clean.csv`, Kaggle `ref 58371665`, `SubmissionStatus.COMPLETE` at `05:58:03Z`)**:
+  - **`EXP-015b LogitH + PurePhysViT 12%` (`exp015b_gv_pp12_clean.csv` / `results/submission.csv`, Official Final Submission, Kaggle `ref 58371665`, `SubmissionStatus.COMPLETE`)**:
     - Formula: `0.55*GBDT + 0.33*ViT + 0.12*PurePhysViT` (`alpha=0.72`, `cons_p=[0.195, 0.265, 0.06, 0.232, 0.015, true]`).
     - Nested 5-Fold Date-CV (`707` stems): `PQ=0.47196` (`SQ=0.69398, RQ=0.68008, TP=5322, FP=2130, FN=2877`), `Sim80=0.47460 ± 0.00169`, `mean_gain=+0.00005 vs exp015a` (`p=0.550`).
-    - Validation & Test Shift Audit: `0` validation errors, `1192` predictions across `180` test images (`mean=6.622`, `empty=3`, `lt580=0.1753`, `median_area=1188.0`), Public LB `0.41` (submitted `05:53:49Z`, scored `COMPLETE` before `06:00Z` cutoff).
-- **Sweep Variants Tested & Discarded (`5F Nested Date-CV` vs `0.47196`)**: `gv_pp08 (0.47130)`, `gv_pp10 (0.47186)`, `gv_pp15 (0.47036)`, `gv_pp12_gl2_05 (0.47061)`.
-- **Remote Compute Status at Deadline**:
-  - Colab A100 Stage-2 (`unet-mitb4` on `dl_enh`): aborted cleanly after verifying `ep=1/7` (`37.2m`) and `ep=2/7` (`44.4m`, `va_orig_dice=0.8086`) could not complete 5 folds before cutoff; runtime deleted (`0` active sessions, `39.39` compute units preserved).
-  - Kaggle `ajikajadeh/filseg-w5-exp013-det`: remained `RUNNING` past submission cutoff.
+    - Validation & Test Shift Audit: `0` validation errors, `1192` predictions across `180` test images (`mean=6.622`, `empty=3`, `lt580=0.1753`, `median_area=1188.0`), **Public LB `0.41`**.
+  - **`EXP-016 v4_y26_cnx` (`exp016_v4_tab_raw_clean.csv`, Kaggle `ref 58414256`, `SubmissionStatus.COMPLETE`)**:
+    - Pool expansion (`43,356` OOF cands, `84.99%` OracleRecall@0.5 on `5,209` record-0 GT: `+ YOLO26x-seg @ 1536px + 5-ch EdgeGuidedMHSAUNet (ConvNeXt-Edge) + 11 MiT-B3 dense/CC features`).
+    - 3-Family Tabular (`Tab3Fam_HeavyLGB`: `0.55*LightGBM + 0.28*CatBoost + 0.17*XGBoost`): Nested 5-Fold Date-CV `PQ=0.47256` (`SQ=0.6939, RQ=0.6810, TP=5301, FP=2068, FN=2898`), `1rec PQ=0.47848`, `Sim80=0.47470`, `vsTA=+0.00637` (`p=1.0000`).
+    - Public LB probe (`ab=0.025, allow=False`, trees-only without `VisionCropTransformer`): scored `0.40` (`1196` test preds), confirming that pairing `VisionCropTransformer` patch attention with conservative Track-A anchoring (`ab=0.06, allow=True` in `EXP-015b`) is essential against cross-station test shift.
+- **Sweep Variants Tested & Discarded (`5F Nested Date-CV` vs `0.47196`)**: `gv_pp08 (0.47130)`, `gv_pp10 (0.47186)`, `gv_pp15 (0.47036)`, `gv_pp12_gl2_05 (0.47061)`, `v5_y26_3cnx (0.46960)`.

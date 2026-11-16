@@ -5,9 +5,9 @@ Solution to the [Solar Filament Segmentation Challenge 2026](https://www.kaggle.
 
 | | |
 |---|---|
-| 5-Fold Out-of-Fold PQ (707 training photos, 5 folds grouped by date) | **0.4720** (95% CI 0.4713–0.4779), SQ 0.6940, RQ 0.6801 (TP 5,322, FP 2,130, FN 2,877) |
+| 5-Fold Out-of-Fold PQ (707 training photos, 5 folds grouped by date) | **0.4720** (`exp015b_gv_pp12`, SQ 0.6940, RQ 0.6801, TP 5,322, FP 2,130, FN 2,877; **0.4726** on `exp016_v4_tab`, 1-record PQ **0.4785**, 85.0% Oracle Recall on 43,356 candidates) |
 | Cross-Family Continuous Vote-Map Super-Ensemble (Fold-0 Validation PQ) | **0.4856** (SQ 0.6924, RQ 0.7013; **98.0%** held-out date split-half win rate) |
-| Public leaderboard PQ | **0.410** (`exp015b_gv_pp12_clean.csv` / `results/submission.csv`) |
+| Public leaderboard PQ | **0.410** (`exp015b_gv_pp12_clean.csv` / `results/submission.csv`, Kaggle Ref `#58371665`) |
 | Reference: one human annotator scored against another | PQ 0.3398 (SQ 0.6329, RQ 0.5369) |
 | Public Git Repository | `https://github.com/yauwes/filament-segmentation-2026-sota` |
 
@@ -15,12 +15,12 @@ Solution to the [Solar Filament Segmentation Challenge 2026](https://www.kaggle.
 
 ## Method in five lines
 
-1. **Detect (Full-Disk + Multi-Scale SAHI).** A YOLO11m box detector on the full frame (1280 px) proposes filaments and gives each a confidence.
+1. **Detect (Full-Disk + Overlapped $1024^2$ SAHI + Multi-Family Instance Seg).** A YOLO11m box detector on the full frame (1280 px) proposes filaments and gives each a confidence.
    It is trained on the boxes of *every* annotator record, so the confidence reflects how likely an annotator is to
-   mark the structure. A student copy (`m1280s`) is self-trained on 3,000 unlabeled GONG archive frames and merged via WBF (`ms`), complemented by multi-scale Slicing Aided Hyper Inference (SAHI at $960^2, 1152^2, 1408^2$ tiles + $1536^2$ full-frame) across `RT-DETR-L`, `YOLO11x-seg`, `YOLO26x-seg`, and `Mask2Former Swin-Base` (`gap_research/`), plus YOLO11m (`G1, A, B, P1, P4a`), Faster R-CNN ResNet50-FPNv2 (`F0, F1, F3`), and single-stage YOLOv8s-seg (`1536 px`).
-2. **Crop & 5-Channel Spatial Prompts.** Each box is cut out of the 2048-px frame with context padding and resized to 512 px alongside explicit Gaussian spatial prompt channels ($C_4$: focal box indicator; $C_5$: union of intersecting peer boxes), so thin filaments and barbs are segmented at native resolution without merging adjacent ribbons.
-3. **Segment (Box-Prompted Refiners + $1536^2$ Dense Priors).** A 5-fold U-Net++ with an EfficientNet-B4 backbone (`e4`), `SAM 2.1 Hiera-B+` (`avgSAM2`), and 5-channel box-prompted refiners (`UPerNet-ConvNeXt-Small`, `SegFormer-MiT-B3`, `UNet-MiT-B4`, and dual-head boundary-supervised `FPN-ConvNeXt-Base`) are fused with $1536\times 1536$ full-frame dense `ConvNeXt-Small` and `MiT-B3` probability priors on our 3-channel solar-physics representation (`filseg/enhance.py` and `gap_research/solar_dl_enhance.py`).
-4. **Vision-Tabular Meta-Calibration & Coordinate-Ascent Paint (`PP12`).** Out-of-fold `LightGBM`, `CatBoost`, and `PurePhysViT` models trained on 90 geometric, topological, and multi-scale consensus features are ensembled with a 6-channel `VisionCropTransformer` (`ConvNeXt-Tiny`) on $128\times 128$ crops to predict calibrated $\widehat{\text{IoU}}$ and $\hat{p}_{\text{TP}}$, followed by nested coordinate-ascent post-processing (`PP12`: peer probability inhibition, adaptive thresholding, fragment pruning, and greedy non-overlapping painting).
+   mark the structure. A student copy (`m1280s`) is self-trained on 3,000 unlabeled GONG archive frames and merged via WBF (`ms`), complemented by $3\times 3$ overlapped $1024\times 1024$ Slicing Aided Hyper Inference (`SAHI`, `exp007_sahi1024`) with visibility-normalized cross-tile WBF, full-frame $1536\times 1536$ `YOLO26x-seg` (`exp013a_stage1_det_sota`) and `YOLOv8s-seg`, plus YOLO11m (`G1, A, B, P1, P4a`) and Faster R-CNN ResNet50-FPNv2 (`F0, F1, F3`).
+2. **Crop & 5-Channel Spatial Prompts.** Each box is cut out of the 2048-px frame with context padding (`pad=0.20`) and resized to 512 px alongside explicit spatial prompt channels ($C_4$: focal box indicator; $C_5$: union of intersecting peer boxes), so thin filaments and barbs are segmented at native resolution without merging adjacent ribbons.
+3. **Segment (Native Crop Segmenters + 5-Channel `EdgeGuidedMHSAUNet` + $1536^2$ Dense Priors).** A 5-fold U-Net++ with an EfficientNet-B4 backbone (`e4` and truncation-aware `e4x`), fine-tuned `SAM 2.1 Hiera-B+` (`avgSAM2`), and our 5-channel `EdgeGuidedMHSAUNet` (`tu-convnext_small.fb_in22k` with `[clahe_clv, flat_z, bth7_z, target_box_hint, other_boxes_hint]` input, a $32\times 32$ 4-head Multi-Head Self-Attention bottleneck, and auxiliary morphological boundary supervision in `exp013c_stage2_seg_sota.py`) are fused with $1536\times 1536$ 4-channel (`[clahe_clv, flat_z, bth7_z, radial_r]`) full-frame dense `ConvNeXt-Small` and `SegFormer-MiT-B3` U-Net probability priors (`exp012_fullframe_dense_physics.py`) on our solar-physics representation (`filseg/enhance.py` and `solar_dl_enhance.py`).
+4. **Vision-Tabular Logit-Hurdle Meta-Calibration & Exact Disjoint MWIS (`exp015b_gv_pp12` / `exp016`).** Leak-free 5-fold out-of-fold `LightGBM`, `CatBoost`, `XGBoost`, and provenance-zeroed `PurePhysViT` (`12%` weight in `gv_pp12`) models trained on 86–97 geometric, topological, radial-limb, multi-stream agreement, and `MiT-B3` dense/CC features (`mit_features.py`) are fused via Logit-Hurdle utility calibration ($\hat{u}_{\text{cal}} = \alpha\,\sigma(\sum_b w_b\operatorname{logit}(\hat{h}_b))\hat{m} + (1-\alpha)\hat{u}$) with a 4-channel $48\times 48$ `VisionCropTransformer` (`[raw_gray, mask_prob, peer_union, ring_grad]` $\to$ 36 visual tokens + `[CLS]` + projected tabular token $\to$ 3-layer Pre-LN Transformer with D4 TTA and 6-epoch SWA in `exp011c_transformer_rescorer.py`), then decoded via Exact Maximum Weight Independent Set (`MWIS`) optimization on the overlap conflict graph ($\text{IoU} > 0.01$) and disjoint RLE painting.
 5. **Cross-Family Continuous Vote-Map Super-Ensemble.** Proposals across the core members (`G1, A, B, P1, P4a, F0, F1, YOLOv8s-seg`) are clustered at $\tau_{\text{match}} = 0.40$ into a continuous confidence-weighted vote map $V_{\text{core}}(x,y) \in [0, 1]$, gated in the marginal zone $c \in [0.30, 0.32)$ by cross-family confirmation (`F3` + `ms`/`s`), and refined by injecting donor masks (`ms, s, main, F3`) with per-pixel denominator normalization.
 
 Details, mathematical derivations, ablations, and failure cases: [`report/report.pdf`](report/report.pdf) (also mirrored at [`report/technical_report.pdf`](report/technical_report.pdf) and [`research/methodology.md`](research/methodology.md)).
@@ -28,9 +28,10 @@ Details, mathematical derivations, ablations, and failure cases: [`report/report
 ## Reproduce the submission
 
 The notebook [`notebooks/pipeline.ipynb`](notebooks/pipeline.ipynb) runs the complete 5-fold pipeline (setup, pre-processing, optional
-training, inference with the weights in `weights/`, post-processing, evaluation, examples). To run the full 5-fold Vision-Tabular Meta-Calibration & `PP12` pipeline (`0.4720` OOF PQ, `0.410` Public LB) or the 12-stream Cross-Family Continuous Vote-Map Super-Ensemble directly:
+training, inference with the weights in `weights/`, post-processing, evaluation, examples). To run the full 5-fold Vision-Tabular Logit-Hurdle + Exact MWIS pipeline (`0.4720`–`0.4726` OOF PQ, `0.410` Public LB) or the 12-stream Cross-Family Continuous Vote-Map Super-Ensemble directly:
 ```bash
 python3 gap_research/scripts/exp015_wave5_fusion.py
+python3 gap_research/scripts/exp016_full_wave5_fusion.py --pool /path/to/w5_candidate_pool_v4_y26_cnx.pkl
 ```
 
 ```bash
@@ -82,6 +83,7 @@ report/                technical report (official Overleaf ACM sigconf LaTeX sou
 research/              literature review, 9-part scientific methodology, experiment log (E01-E19), BibTeX
 figures/               publication-grade PaperBanana vector PDF and 300-DPI PNG figure suites + generator
 scripts/               super-ensemble submission builder, figure scripts, GONG archive downloader
+gap_research/          Wave 1–5 research suite: SAHI 1024, dense priors (exp012), YOLO26x-seg (exp013a), EdgeGuidedMHSAUNet (exp013c), VisionCropTransformer (exp011c), Logit-Hurdle + Exact MWIS fusion (exp015, exp016), OOF error analysis, and validated submissions
 remote/, jobs/         how the models were trained on Kaggle and Colab GPUs (not needed to reproduce)
 ```
 

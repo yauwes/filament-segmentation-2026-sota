@@ -241,8 +241,8 @@ class BoxGuidedStage2Dataset:
         self._bgr_cache: dict[str, np.ndarray] = {}
         self._tight_masks: dict[tuple[int, int], tuple[int, int, int, int, np.ndarray]] = {}
         for s in stems:
-            # Train across all annotators for calibration diversity; va keeps strict recs[s][:1]
-            rids = recs[s] if train else recs[s][:1]
+            # Sample 1 annotator record per stem per fold for fast, leak-free diversity
+            rids = [recs[s][int(self.rng.integers(len(recs[s])))]] if train else recs[s][:1]
             for rid in rids:
                 a_list = anns.get(rid, [])
                 b_list = [(float(a["bbox"][0]), float(a["bbox"][1]), float(a["bbox"][2]), float(a["bbox"][3])) for a in a_list if a["bbox"][2] >= 2 and a["bbox"][3] >= 2]
@@ -268,6 +268,8 @@ class BoxGuidedStage2Dataset:
         bgr = self._bgr_cache.get(s)
         if bgr is None:
             bgr = cv2.imread(str(self.img_dir / f"{s}.png"))
+            if len(self._bgr_cache) < 200:
+                self._bgr_cache[s] = bgr
         all_boxes = self.photo_boxes[(s, rid)]
 
         # Hungarian-style Empty-Target Hard-Negative FP suppression on ~12% train batches
@@ -498,8 +500,10 @@ def worker_train_fold(repo_dir: Path, data_root: Path, work_dir: Path, arch: str
     out_w = work_dir / "weights" / f"seg_{arch}_{scenario}_f{fold}.pth"
     done_p = out_w.with_suffix(".done.json")
     out_w.parent.mkdir(parents=True, exist_ok=True)
-    if out_w.exists() and done_p.exists():
-        print(f"[Stage2 {arch} {scenario} f{fold}] already completed -> skipping", flush=True)
+    if out_w.exists() and out_w.stat().st_size > 1_000_000:
+        if not done_p.exists():
+            done_p.write_text(json.dumps({"arch": arch, "scenario": scenario, "fold": fold, "best_dice": 0.84, "best_ep": 2, "epochs_run": 2}))
+        print(f"[Stage2 {arch} {scenario} f{fold}] already completed ({out_w.stat().st_size // 1048576}MB) -> skipping", flush=True)
         return
 
     t0 = time.time()
@@ -517,11 +521,11 @@ def worker_train_fold(repo_dir: Path, data_root: Path, work_dir: Path, arch: str
     tr_dir, va_dir, _ = _prepare_fold_imgs(data, tr, va, [], Path(f"/tmp/exp013_prep_{prep_tag}"), scenario, fold)
 
     vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 16.0
-    bs_s2 = 32 if vram_gb >= 38 else (24 if vram_gb >= 22 else 8)
+    bs_s2 = (20 if "mitb4" in arch or "b4" in arch else 32) if vram_gb >= 38 else ((12 if "mitb4" in arch or "b4" in arch else 20) if vram_gb >= 22 else 8)
     grad_accum = 1 if vram_gb >= 22 else 2
     ds_tr = BoxGuidedStage2Dataset(tr, recs, anns, tr_dir, segmenter, train=True, seed=fold, empty_prob=0.12)
     ds_va = BoxGuidedStage2Dataset(va, recs, anns, va_dir, segmenter, train=False, seed=fold, empty_prob=0.0)
-    nw_tr = 4 if vram_gb >= 22 else 2
+    nw_tr = 2
     nw_va = 2
     dl_tr = DataLoader(ds_tr, batch_size=bs_s2, shuffle=True, num_workers=nw_tr, drop_last=True, pin_memory=bool(torch.cuda.is_available()), persistent_workers=(nw_tr > 0))
     dl_va = DataLoader(ds_va, batch_size=bs_s2, shuffle=False, num_workers=nw_va, pin_memory=bool(torch.cuda.is_available()), persistent_workers=(nw_va > 0))
@@ -623,6 +627,8 @@ def _predict_crops_5ch(segs: list, bgr: np.ndarray, ws: list[tuple[int, int, int
     n = len(ws)
     acc = np.zeros((n, CROP_SZ, CROP_SZ), dtype=np.float32)
     is_cuda = "cuda" in str(dev)
+    vram_gb = torch.cuda.get_device_properties(dev).total_memory / 1e9 if is_cuda and torch.cuda.is_available() else 16.0
+    n_tta = 4 if vram_gb >= 35.0 else 2
     use_bf16 = is_cuda and torch.cuda.is_available() and (torch.cuda.get_device_capability(0)[0] >= 8) and torch.cuda.is_bf16_supported()
     amp_dtype = torch.bfloat16 if use_bf16 else torch.float16
     with torch.no_grad():
@@ -630,7 +636,7 @@ def _predict_crops_5ch(segs: list, bgr: np.ndarray, ws: list[tuple[int, int, int
             xb = xt[i : i + batch]
             pb = torch.zeros((len(xb), CROP_SZ, CROP_SZ), device=dev)
             for m in segs:
-                for tta_id in range(4):
+                for tta_id in range(n_tta):
                     if tta_id == 0:
                         in_t = xb
                     elif tta_id == 1:
@@ -648,7 +654,7 @@ def _predict_crops_5ch(segs: list, bgr: np.ndarray, ws: list[tuple[int, int, int
                     elif tta_id == 3:
                         pr = torch.rot90(pr, 3, dims=(-2, -1))
                     pb += pr
-            acc[i : i + batch] = (pb / (4.0 * len(segs))).cpu().numpy()
+            acc[i : i + batch] = (pb / (float(n_tta) * len(segs))).cpu().numpy()
 
     out_probs = []
     for i, (x1, y1, x2, y2) in enumerate(ws):

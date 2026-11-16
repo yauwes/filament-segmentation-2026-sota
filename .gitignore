@@ -12,3 +12,6 @@ report/*.blg
 report/build/
 yolo11*.pt
 catboost_info/
+*.pkl
+*.preds.pkl
+*.npy

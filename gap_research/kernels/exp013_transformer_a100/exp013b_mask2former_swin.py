@@ -152,7 +152,7 @@ class SolarMask2FormerDataset:
         self._bgr_cache: dict[str, np.ndarray] = {}
 
     def __len__(self) -> int:
-        return len(self.stems) * (4 if self.train else 1)
+        return len(self.stems) * (2 if self.train else 1)
 
     def __getitem__(self, idx: int):
         import torch
@@ -163,6 +163,8 @@ class SolarMask2FormerDataset:
         bgr = self._bgr_cache.get(s)
         if bgr is None:
             bgr = cv2.imread(str(self.img_dir / f"{s}.png"))
+            if len(self._bgr_cache) < 200:
+                self._bgr_cache[s] = bgr
         rids = self.recs[s]
         rid = rids[int(self.rng.integers(len(rids)))] if self.train else rids[0]
 
@@ -318,12 +320,12 @@ def worker_train_fold(repo_dir: Path, data_root: Path, work_dir: Path, scenario:
     tr_dir, va_dir, _ = _prepare_images(data, tr, va, [], cache_dir, scenario, fold)
 
     vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 16.0
-    bs_m2f = 8 if vram_gb >= 48 else 4
+    bs_m2f = 4 if vram_gb >= 65 else 2
     cp_bank = sde.build_tr_copypaste_bank(tr, tr_dir, recs, anns, max_bank=320, seed=fold) if scenario == "dl_enh_copypaste" else None
     ds_tr = SolarMask2FormerDataset(tr, recs, anns, tr_dir, cp_bank=cp_bank, train=True, seed=fold)
     ds_va = SolarMask2FormerDataset(va, recs, anns, va_dir, cp_bank=None, train=False, seed=fold)
 
-    dl_tr = DataLoader(ds_tr, batch_size=bs_m2f, shuffle=True, num_workers=4, collate_fn=_collate_m2f, drop_last=True, pin_memory=True)
+    dl_tr = DataLoader(ds_tr, batch_size=bs_m2f, shuffle=True, num_workers=2, collate_fn=_collate_m2f, drop_last=True, pin_memory=True)
     dl_va = DataLoader(ds_va, batch_size=bs_m2f, shuffle=False, num_workers=2, collate_fn=_collate_m2f, pin_memory=True)
 
     model = _build_m2f_model().to(dev)

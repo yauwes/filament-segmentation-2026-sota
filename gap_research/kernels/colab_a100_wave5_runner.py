@@ -189,10 +189,41 @@ def stage_fast_wave5(repo_root: pathlib.Path, w4_dir: pathlib.Path) -> tuple[pat
     prev_w5 = pathlib.Path("/tmp/prev_w5_a100_out")
     shutil.rmtree(prev_w5, ignore_errors=True)
     if subprocess.call(["kaggle", "datasets", "download", "-d", "ajikajadeh/filseg-w5-a100-out", "-p", str(prev_w5), "--unzip"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
-        for p in prev_w5.iterdir():
+        for p in sorted(prev_w5.iterdir()):
             if p.is_file() and p.name not in ("dataset-metadata.json", "w5_a100_error.txt", "w5_a100_status.json") and not (K_WORK / p.name).exists():
                 shutil.copy2(p, K_WORK / p.name)
+            elif p.is_dir() and not (K_WORK / f"{p.name}.tar.gz").exists():
+                subs = [x for x in p.iterdir() if x.is_dir()]
+                src_pack = subs[0] if len(subs) == 1 else p
+                _pack_dir(src_pack, K_WORK / f"{p.name}.tar.gz")
+        # Also restore convnext-edge existing ms/sahi outputs into /tmp/exp013c_convnext-edge_baseline so Step 3b appends yolo26x_seg without losing ms/sahi
+        cnx_unpacked = prev_w5 / "exp013c_convnext_edge_baseline_segs" / "exp013c_out_convnext-edge_baseline"
+        cnx_dst = pathlib.Path("/tmp/exp013c_convnext-edge_baseline/exp013c_out_convnext-edge_baseline")
+        if cnx_unpacked.exists() and not cnx_dst.exists():
+            cnx_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(cnx_unpacked, cnx_dst)
         print(f"Restored existing filseg-w5-a100-out: {[p.name for p in sorted(K_WORK.glob('*.tar.gz'))]}", flush=True)
+
+    prev_wt = pathlib.Path("/tmp/prev_w5_a100_wt")
+    shutil.rmtree(prev_wt, ignore_errors=True)
+    cnx_w_dst = pathlib.Path("/tmp/exp013c_convnext-edge_baseline/weights")
+    y26_w_dst = pathlib.Path("/tmp/exp013_yolo26x-seg_baseline/weights")
+    if not (cnx_w_dst / "seg_convnext-edge_baseline_f4.pth").exists() or not (y26_w_dst / "det_yolo26x-seg_baseline_f4.pt").exists():
+        if subprocess.call(["kaggle", "datasets", "download", "-d", "ajikajadeh/filseg-w5-a100-weights", "-p", str(prev_wt), "--unzip"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+            cnx_w_dst.mkdir(parents=True, exist_ok=True)
+            for f_wt in prev_wt.rglob("seg_convnext-edge_baseline_f*"):
+                if f_wt.is_file() and not (cnx_w_dst / f_wt.name).exists():
+                    shutil.copy2(f_wt, cnx_w_dst / f_wt.name)
+            if len(list(cnx_w_dst.glob("*.pth"))) == 5 and not (K_WORK / "exp013c_convnext_edge_baseline_weights.tar.gz").exists():
+                _pack_dir(cnx_w_dst, K_WORK / "exp013c_convnext_edge_baseline_weights.tar.gz")
+            print(f"Restored existing convnext-edge weights: {[p.name for p in sorted(cnx_w_dst.glob('*.pth'))]}", flush=True)
+            y26_w_dst.mkdir(parents=True, exist_ok=True)
+            for f_wt in prev_wt.rglob("det_yolo26x-seg_baseline_f*"):
+                if f_wt.is_file() and not (y26_w_dst / f_wt.name).exists():
+                    shutil.copy2(f_wt, y26_w_dst / f_wt.name)
+            if any(y26_w_dst.glob("*.pt")):
+                print(f"Restored existing yolo26x-seg weights from w5-weights: {[p.name for p in sorted(y26_w_dst.glob('*.pt'))]}", flush=True)
+        shutil.rmtree(prev_wt, ignore_errors=True)
 
     # Prebuild shared baseline physics_3ch PNGs once (~25s across 12 CPUs)
     shared_dir = pathlib.Path("/tmp/shared_phys")
@@ -242,7 +273,7 @@ def _sync_det_from_kaggle() -> tuple[pathlib.Path | None, pathlib.Path | None]:
             det_dl.mkdir(parents=True, exist_ok=True)
             _run(["kaggle", "kernels", "output", "ajikajadeh/filseg-w5-exp013-det", "-p", str(det_dl)], check=False, quiet_log="/tmp/stage_w5.log")
             for tgz in det_dl.glob("*.tar.gz"):
-                if not (K_WORK / tgz.name).exists():
+                if not tgz.name.endswith("_weights.tar.gz") and not (K_WORK / tgz.name).exists():
                     shutil.copy2(tgz, K_WORK / tgz.name)
 
     y26_tar = next(iter(sorted(K_WORK.glob("exp013_yolo26x_seg_*_boxes.tar.gz"))), None)
@@ -310,9 +341,14 @@ def main() -> None:
         m2f_script = _patch_script(w4_dir / "exp013b_mask2former_swin.py", w4_dir / "_colab_w5_exp013b.py", single_gpu=(n_gpu <= 1))
 
         win_sc = "baseline"
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 16.0
+        run_mitb4 = (os.environ.get("RUN_MITB4", "0") == "1")
+        s2_arch_list = [(1, "convnext-edge"), (4, "unet-mitb4")] if run_mitb4 else [(1, "convnext-edge")]
 
-        # [1/4 & 2/4] EXP-013c Stage-2 unet-mitb4 & convnext-edge (baseline, fast 5F train + infer, ~12m each)
-        for step_idx, s2_arch in ((1, "unet-mitb4"), (2, "convnext-edge")):
+        # [1/4] EXP-013c Stage-2 convnext-edge (already completed & restored -> skips in 0s)
+        for step_idx, s2_arch in s2_arch_list:
+            if step_idx != 1:
+                continue
             safe_s2 = s2_arch.replace("-", "_")
             seg_tar = K_WORK / f"exp013c_{safe_s2}_{win_sc}_segs.tar.gz"
             if not seg_tar.exists() and _within_budget(14.0):
@@ -324,7 +360,7 @@ def main() -> None:
                     if sahi_cache.exists():
                         box_args.extend(["--boxes-root", f"sahi={sahi_cache}"])
                     print(f"\n=== [{step_idx}/4] EXP-013c Stage-2 {s2_arch} ({win_sc}, boxes={[b.split('=')[0] for b in box_args[1::2]]}) ===", flush=True)
-                    _run([sys.executable, str(s2_script), "--arch", s2_arch, "--scenario", win_sc, "--epochs", "8", "--patience", "3", *box_args], env=env_w5, cwd=str(PREWARM_DIR))
+                    _run([sys.executable, "-u", str(s2_script), "--arch", s2_arch, "--scenario", win_sc, "--epochs", "3", "--patience", "2", *box_args], env=env_w5, cwd=str(PREWARM_DIR))
                     s2_w = pathlib.Path(f"/tmp/exp013c_{s2_arch}_{win_sc}/weights")
                     if s2_w.exists():
                         _pack_dir(s2_w, K_WORK / f"exp013c_{safe_s2}_{win_sc}_weights.tar.gz")
@@ -334,13 +370,16 @@ def main() -> None:
                 except Exception as e_s2:
                     status_rec["steps"][f"s2_{safe_s2}"] = {"status": "error", "err": str(e_s2)}
                     print(f"[warn] Step {step_idx}/4 {s2_arch} error: {e_s2}", flush=True)
+            else:
+                print(f"[skip] Step {step_idx}/4 {s2_arch} already present at {seg_tar}", flush=True)
+                status_rec["steps"][f"s2_{safe_s2}"] = {"status": "restored", "min": 0.0}
 
-        # [3/4] Complete EXP-013a yolo26x-seg (Folds 0,1,2,3 from Kaggle + Fold 4 + 5F infer on A100, ~14m)
+        # [2/4] Complete EXP-013a yolo26x-seg (Folds 0,1,2,3 from Kaggle + Fold 4 + 5F infer)
         y26_tar = K_WORK / f"exp013_yolo26x_seg_{win_sc}_boxes.tar.gz"
-        if not y26_tar.exists() and _within_budget(15.0):
+        if not y26_tar.exists() and _within_budget(12.0):
             ts = time.time()
             try:
-                print("\n=== [3/4] EXP-013a yolo26x-seg (Resume Folds 0,1,2,3 + Fold 4 + 5F Infer) ===", flush=True)
+                print("\n=== [2/4] EXP-013a yolo26x-seg (Resume Folds 0,1,2,3 + Fold 4 + 5F Infer) ===", flush=True)
                 from ultralytics import YOLO
                 old_cwd = os.getcwd()
                 os.chdir(PREWARM_DIR)
@@ -369,30 +408,30 @@ def main() -> None:
                         print(f"[y26] Restored folds: {[p.name for p in sorted(y26_w.glob('det_*.pt'))]}", flush=True)
                     shutil.rmtree(dl_det, ignore_errors=True)
 
-                _run([sys.executable, str(s1_script), "--arch", "yolo26x-seg", "--scenario", win_sc, "--epochs", "10", "--patience", "3", "--pseudo-conf", "0.0"], env=env_w5, cwd=str(PREWARM_DIR))
+                _run([sys.executable, "-u", str(s1_script), "--arch", "yolo26x-seg", "--scenario", win_sc, "--epochs", "6", "--patience", "2", "--pseudo-conf", "0.0"], env=env_w5, cwd=str(PREWARM_DIR))
                 status_rec["steps"]["yolo26x_seg_base"] = {"status": "complete", "min": round((time.time() - ts) / 60.0, 2)}
                 (K_WORK / "w5_a100_status.json").write_text(json.dumps(status_rec, indent=2))
-                _publish_out("Wave-5 A100 [3/4]: YOLO26x-seg 5F complete")
+                _publish_out("Wave-5 A100 [2/4]: YOLO26x-seg 5F complete")
 
-                # Run Stage-2 inference on newly generated yolo26x_seg boxes (~2m per arch)
+                # Run Stage-2 inference on newly generated yolo26x_seg boxes (~14m on L4 with 2-view TTA)
                 y26_dir, _ = _sync_det_from_kaggle()
                 if y26_dir is not None and y26_dir.exists():
-                    for s2_arch in ("unet-mitb4", "convnext-edge"):
+                    for s2_arch in ("convnext-edge", "unet-mitb4"):
                         w_s2 = pathlib.Path(f"/tmp/exp013c_{s2_arch}_{win_sc}/weights")
                         if w_s2.exists() and len(list(w_s2.glob("*.pth"))) == 5:
-                            _run([sys.executable, str(s2_script), "--arch", s2_arch, "--scenario", win_sc, "--epochs", "8", "--patience", "3", "--boxes-root", f"yolo26x_seg={y26_dir}"], env=env_w5, cwd=str(PREWARM_DIR))
-                    _publish_out("Wave-5 A100 [3b/4]: Stage-2 segs updated with yolo26x_seg boxes")
+                            _run([sys.executable, "-u", str(s2_script), "--arch", s2_arch, "--scenario", win_sc, "--epochs", "3", "--patience", "2", "--boxes-root", f"yolo26x_seg={y26_dir}"], env=env_w5, cwd=str(PREWARM_DIR))
+                    _publish_out("Wave-5 A100 [2b/4]: Stage-2 segs updated with yolo26x_seg boxes")
             except Exception as e_s1:
                 status_rec["steps"]["yolo26x_seg_base"] = {"status": "error", "err": str(e_s1)}
-                print(f"[warn] Step 3/4 yolo26x-seg error: {e_s1}", flush=True)
+                print(f"[warn] Step 2/4 yolo26x-seg error: {e_s1}", flush=True)
 
-        # [4/4] Complete EXP-013b Mask2Former Swin-Base (Folds 0,1,3,4 from Kaggle + Fold 2 3-epoch + 5F infer on A100, ~24m)
+        # [3/4] Complete EXP-013b Mask2Former Swin-Base (Folds 0,1,3,4 from Kaggle + Fold 2 3-epoch + 5F infer)
         m2f_tar = K_WORK / f"exp013b_{win_sc}_m2f_probs.tar.gz"
         m2f_inst_tar = K_WORK / f"exp013b_{win_sc}_m2f_inst.tar.gz"
-        if (not m2f_tar.exists() or not m2f_inst_tar.exists()) and _within_budget(22.0):
+        if (not m2f_tar.exists() or not m2f_inst_tar.exists()) and _within_budget(18.0):
             ts = time.time()
             try:
-                print("\n=== [4/4] EXP-013b Mask2Former Swin-Base (Resume Folds 0,1,3,4 + Fold 2 3-ep + 5F Infer) ===", flush=True)
+                print("\n=== [3/4] EXP-013b Mask2Former Swin-Base (Resume Folds 0,1,3,4 + Fold 2 3-ep + 5F Infer) ===", flush=True)
                 m2f_work = pathlib.Path(f"/tmp/exp013b_m2f_{win_sc}")
                 m2f_w = m2f_work / "weights"
                 m2f_w.mkdir(parents=True, exist_ok=True)
@@ -416,13 +455,41 @@ def main() -> None:
                         print(f"[m2f] Restored folds: {[p.name for p in sorted(m2f_w.glob('m2f_baseline_f*')) if p.is_dir()]}", flush=True)
                     shutil.rmtree(dl_m2f, ignore_errors=True)
 
-                _run([sys.executable, str(m2f_script), "--scenario", win_sc, "--epochs", "3", "--patience", "2"], env=env_w5, cwd=str(PREWARM_DIR))
+                _run([sys.executable, "-u", str(m2f_script), "--scenario", win_sc, "--epochs", "3", "--patience", "2"], env=env_w5, cwd=str(PREWARM_DIR))
                 status_rec["steps"]["m2f_swin"] = {"status": "complete", "min": round((time.time() - ts) / 60.0, 2)}
                 (K_WORK / "w5_a100_status.json").write_text(json.dumps(status_rec, indent=2))
-                _publish_out("Wave-5 A100 [4/4]: Mask2Former Swin-Base 5F complete")
+                _publish_out("Wave-5 A100 [3/4]: Mask2Former Swin-Base 5F complete")
             except Exception as e_m2f:
                 status_rec["steps"]["m2f_swin"] = {"status": "error", "err": str(e_m2f)}
-                print(f"[warn] Step 4/4 m2f error: {e_m2f}", flush=True)
+                print(f"[warn] Step 3/4 m2f error: {e_m2f}", flush=True)
+
+        # [4/4] Optional EXP-013c Stage-2 unet-mitb4 (runs on A100 >=35GB or when RUN_MITB4=1)
+        if run_mitb4:
+            s2_arch = "unet-mitb4"
+            safe_s2 = s2_arch.replace("-", "_")
+            seg_tar = K_WORK / f"exp013c_{safe_s2}_{win_sc}_segs.tar.gz"
+            if not seg_tar.exists() and _within_budget(45.0):
+                ts = time.time()
+                try:
+                    box_args = []
+                    if ms_cache.exists():
+                        box_args.extend(["--boxes-root", f"ms={ms_cache}"])
+                    if sahi_cache.exists():
+                        box_args.extend(["--boxes-root", f"sahi={sahi_cache}"])
+                    y26_dir, _ = _sync_det_from_kaggle()
+                    if y26_dir is not None and y26_dir.exists():
+                        box_args.extend(["--boxes-root", f"yolo26x_seg={y26_dir}"])
+                    print(f"\n=== [4/4] EXP-013c Stage-2 {s2_arch} ({win_sc}, boxes={[b.split('=')[0] for b in box_args[1::2]]}) ===", flush=True)
+                    _run([sys.executable, "-u", str(s2_script), "--arch", s2_arch, "--scenario", win_sc, "--epochs", "3", "--patience", "2", *box_args], env=env_w5, cwd=str(PREWARM_DIR))
+                    s2_w = pathlib.Path(f"/tmp/exp013c_{s2_arch}_{win_sc}/weights")
+                    if s2_w.exists():
+                        _pack_dir(s2_w, K_WORK / f"exp013c_{safe_s2}_{win_sc}_weights.tar.gz")
+                    status_rec["steps"][f"s2_{safe_s2}"] = {"status": "complete", "min": round((time.time() - ts) / 60.0, 2)}
+                    (K_WORK / "w5_a100_status.json").write_text(json.dumps(status_rec, indent=2))
+                    _publish_out(f"Wave-5 A100 [4/4]: EXP-013c {s2_arch} 5F complete")
+                except Exception as e_s2:
+                    status_rec["steps"][f"s2_{safe_s2}"] = {"status": "error", "err": str(e_s2)}
+                    print(f"[warn] Step 4/4 {s2_arch} error: {e_s2}", flush=True)
 
         status_rec["completed_cleanly"] = True
     except BaseException as exc:
@@ -432,6 +499,15 @@ def main() -> None:
         print(status_rec["error"], flush=True)
         raise
     finally:
+        for w_sub, w_tar_name in (
+            (pathlib.Path("/tmp/exp013_yolo26x-seg_baseline/weights"), "exp013_yolo26x_seg_baseline_weights.tar.gz"),
+            (pathlib.Path("/tmp/exp013b_m2f_baseline/weights"), "exp013b_m2f_baseline_weights.tar.gz"),
+        ):
+            if w_sub.exists() and any(w_sub.iterdir()):
+                try:
+                    _pack_dir(w_sub, K_WORK / w_tar_name)
+                except Exception:
+                    pass
         status_rec["total_min"] = round((time.time() - t0) / 60.0, 2)
         (K_WORK / "w5_a100_status.json").write_text(json.dumps(status_rec, indent=2))
         _publish_out(f"Wave-5 A100 Final ({status_rec['total_min']}m)", include_weights=True)

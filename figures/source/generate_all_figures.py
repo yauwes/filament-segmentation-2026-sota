@@ -102,10 +102,10 @@ def fig_1_system_architecture():
     ax.axis("off")
 
     zones = [
-        (0.006, 0.068, 0.220, 0.897, "#F9F6EE", "#B8A989", "1. DATA & TRI-PLANE ENHANCE"),
+        (0.006, 0.068, 0.220, 0.897, "#F9F6EE", "#B8A989", "1. DATA & SOLAR-DISK PHYSICS"),
         (0.244, 0.068, 0.232, 0.897, "#EBF4FA", "#6C9BC3", "2. STAGE-1 MULTI-FAMILY DETECT"),
         (0.502, 0.068, 0.224, 0.897, "#E8F5E9", "#66A578", "3. STAGE-2 512² CROP SEGMENT"),
-        (0.768, 0.068, 0.228, 0.897, "#F3E8F8", "#9575CD", "4. 12-STREAM VOTE-MAP WBF"),
+        (0.768, 0.068, 0.228, 0.897, "#F3E8F8", "#9575CD", "4. VISION-TABULAR CALIB & MWIS"),
     ]
     for zx, zy, zw, zh, fc, ec, ztitle in zones:
         zpatch = FancyBboxPatch(
@@ -120,26 +120,26 @@ def fig_1_system_architecture():
     draw_box(ax, 0.015, 0.690, 0.202, 0.200, "GONG Full-Disk H-α",
              "6 Observatories, 2048² Raw\n707 Train (1,154 Rec.) + 180 Test\n5-Fold Date Split + 3k Archive",
              facecolor="#FFFFFF", edgecolor="#7D6B4F", title_size=6.0, sub_size=4.7)
-    draw_box(ax, 0.015, 0.395, 0.202, 0.210, "Tri-Plane Enhancement",
-             r"$C_1$: Black Top-Hat ($r{=}7$ px)" + "\n" + r"$C_2$: 101-px Median Detrend" + "\n" + r"$C_3$: Sato Ridge ($\sigma{\in}\{1..3\}$)",
+    draw_box(ax, 0.015, 0.395, 0.202, 0.210, "Tri-Plane & CLV Physics",
+             r"$C_1$: Black Top-Hat ($r{=}7$ px)" + "\n" + r"$C_2$: 101-px Median Detrend" + "\n" + r"$C_3$: Sato Ridge ($\sigma{\in}\{1..3\}$) + CLV",
              facecolor="#FFFDF7", edgecolor="#7D6B4F", title_size=6.0, sub_size=4.7)
-    draw_box(ax, 0.015, 0.090, 0.202, 0.215, "Solar-Disk MAD Norm.",
-             r"$\tilde{C}_k = \mathrm{clip}\!\left(\frac{C_k - \mu_k}{16\,\hat{\sigma}_k}{+}\frac{1}{2}\right)$" + "\n" + r"$\hat{\sigma}_k{=}1.48\,\mathrm{MAD}_k$ inside $\Omega_\odot$",
-             facecolor="#FFFFFF", edgecolor="#7D6B4F", title_size=6.0, sub_size=4.7)
+    draw_box(ax, 0.015, 0.090, 0.202, 0.215, "Disk MAD + 1536² Dense Priors",
+             r"$\tilde{C}_k = \mathrm{clip}\!\left(\frac{C_k - \mu_k}{16\,\hat{\sigma}_k}{+}\frac{1}{2}\right)$" + "\n" + "ConvNeXt-Small & MiT-B3 4-Ch UNet",
+             facecolor="#FFFFFF", edgecolor="#7D6B4F", title_size=5.8, sub_size=4.6)
 
     # Zone 1 internal arrows
     draw_arrow(ax, 0.116, 0.687, 0.116, 0.608, color="#7D6B4F")
     draw_arrow(ax, 0.116, 0.392, 0.116, 0.308, color="#7D6B4F")
 
     # Zone 2 Nodes (x=0.254, w=0.212 -> outer edges [0.251, 0.469], center 0.360)
-    draw_box(ax, 0.254, 0.705, 0.212, 0.180, "1-Stage Direct Bypass",
-             "YOLOv8s-seg (1536², Raw Input)\nDirect Masks (offset = -1)",
+    draw_box(ax, 0.254, 0.705, 0.212, 0.180, "1-Stage Instance Seg",
+             "YOLO26x-seg & YOLOv8s-seg (1536²)\nDirect Masks + Box Proposals",
              facecolor="#FFFFFF", edgecolor="#2C5E8A", title_size=6.0, sub_size=4.7)
     draw_box(ax, 0.254, 0.405, 0.212, 0.210, "Two-Stage Box Teachers",
              r"Record Loss ($\hat{p}^\star{=}k/M_i$, 1,154 rec.)" + "\nYOLO11m (G1, A, B, main)\n+ Faster R-CNN R50-FPN v2 (F0)",
              facecolor="#FFFFFF", edgecolor="#2C5E8A", title_size=6.0, sub_size=4.65)
-    draw_box(ax, 0.254, 0.090, 0.212, 0.220, "Fold-Isolated Self-Train",
-             r"3-Flip WBF ($c{\geq}0.25$) on 3k Archive" + "\nStudents: P1, P4a, s (YOLO11m)\n+ F1, F3 (FRCNN); ms = WBF(main,s)",
+    draw_box(ax, 0.254, 0.090, 0.212, 0.220, "Self-Train & SAHI 1024²",
+             r"3-Flip WBF ($c{\geq}0.25$) on 3k Archive" + "\nStudents: ms, s, P1, P4a, F3\n+ 3×3 Overlapped 1024² SAHI",
              facecolor="#E1EFFA", edgecolor="#1E4B75", title_size=6.0, sub_size=4.6)
 
     # Zone 1 -> Zone 2 raw input fanout (along x=0.233)
@@ -155,14 +155,14 @@ def fig_1_system_architecture():
             ha="left", va="center", zorder=5)
 
     # Zone 3 Nodes (x=0.511, w=0.206 -> outer edges [0.508, 0.720], center 0.614)
-    draw_box(ax, 0.511, 0.490, 0.206, 0.180, "Instance-Conditioned Crop",
-             "Box +20% Pad → 512×512 (Enhanced)\nTarget Filament = 1, Neighbor = 0",
+    draw_box(ax, 0.511, 0.490, 0.206, 0.180, "5-Ch Spatial-Prompt Crop",
+             "Box +20% Pad → 512×512 (Tri-Plane)\n+ Target Box C4 & Peer Union C5",
              facecolor="#FFFFFF", edgecolor="#2E7D32", title_size=5.8, sub_size=4.6)
     draw_box(ax, 0.511, 0.270, 0.206, 0.185, "Native Crop Segmenters",
-             "U-Net++ EffNet-B4 (S1E/S1, e4)\n+ SAM 2.1 (avgSAM2, 6 streams)\n4-Flip TTA; BCE + Tversky(0.3,0.7)",
-             facecolor="#FFFFFF", edgecolor="#2E7D32", title_size=5.8, sub_size=4.55)
-    draw_box(ax, 0.511, 0.090, 0.206, 0.145, "Per-Stream Mask Painting",
-             "Resize → 2048², thr=0.60, drop=0.70\n7 Core + 4 Donors (ms, s, main, F3)",
+             "U-Net++ EffNet-B4 (e4, e4x, S1E)\n+ SAM 2.1 (avgSAM2) + ConvNeXt-Edge\n(32² MHSA + Aux Edge; BCE+Tversky)",
+             facecolor="#FFFFFF", edgecolor="#2E7D32", title_size=5.7, sub_size=4.45)
+    draw_box(ax, 0.511, 0.090, 0.206, 0.145, "Candidate Pool & Rescue",
+             "Track-A + SAHI + Hysteresis + CC\n43,356 OOF Cands (85.0% Recall)",
              facecolor="#E0F2F1", edgecolor="#1B5E20", title_size=5.7, sub_size=4.5)
 
     # Zone 3 internal arrows
@@ -179,41 +179,38 @@ def fig_1_system_architecture():
     # Zone 1 MAD Enhanced Planes -> bottom highway (y=0.032) -> Zone 3 Crop lower-left (y=0.515, zero crossing)
     draw_ortho(ax, [(0.116, 0.087), (0.116, 0.032), (0.495, 0.032), (0.495, 0.515), (0.508, 0.515)],
                color="#7D6B4F")
-    ax.text(0.305, 0.015, "Enhanced 2048² Tri-Plane Frame (Cuts Crops for Stage 2)",
-            fontsize=4.6, fontweight="bold", color="#6D4C41", ha="center", va="center", zorder=5)
+    ax.text(0.305, 0.015, "Enhanced 2048² Tri-Plane + 1536² Dense Priors (To Stage 2 & Features)",
+            fontsize=4.5, fontweight="bold", color="#6D4C41", ha="center", va="center", zorder=5)
 
     # Zone 4 Nodes (x=0.778, w=0.208 -> outer edges [0.775, 0.989], center 0.882)
-    draw_box(ax, 0.778, 0.675, 0.208, 0.210, "Core Continuous Vote-Map",
-             r"Cluster 8 Core Members (IoU $\geq 0.40$)" + "\n" +
-             r"$V_{\mathrm{core}}(x,y)=\frac{\sum c_m M_m}{\sum c_m}\in[0,1]$" + "\n" +
-             r"Score $c = \bar{c}\,\min(|\mathcal{C}|,8)/8$",
-             facecolor="#FFFFFF", edgecolor="#5E35B1", title_size=5.8, sub_size=4.6)
-    draw_box(ax, 0.778, 0.375, 0.208, 0.215, "Calib. & Donor Injection",
-             r"Confirm $+0.02$ ($F_3 \wedge ms/s$), $c_{\min}{=}0.32$" + "\n" +
-             "2D Inject (ms, s, main, F3)\n" +
-             r"Threshold $V_{\mathrm{super}}(x,y) \geq 0.425$",
-             facecolor="#FFFFFF", edgecolor="#5E35B1", title_size=5.8, sub_size=4.6)
-    draw_box(ax, 0.778, 0.090, 0.208, 0.215, "Greedy Panoptic Painting",
-             r"Sort $c_{\mathrm{new}}\downarrow$; Keep $\geq 70\%$, $\geq 100$ px" + "\nRLE CSV (results/submission.csv)\nFold-0 0.4856 | 5-Fold 0.4636 | LB 0.402",
-             facecolor="#EDE7F6", edgecolor="#4527A0", title_size=5.8, sub_size=4.55)
+    draw_box(ax, 0.778, 0.675, 0.208, 0.210, "Vote-Map & Tabular GBDT",
+             "Cluster Consensus + 97 Geo/Topo\n& MiT-B3 Features → 5F OOF\nLightGBM + CatBoost + XGBoost",
+             facecolor="#FFFFFF", edgecolor="#5E35B1", title_size=5.8, sub_size=4.55)
+    draw_box(ax, 0.778, 0.375, 0.208, 0.215, "VisionCropViT + PurePhysViT",
+             "4×48×48 Patch + Tab Token (3-L ViT)\n+ Provenance-Free PurePhysViT (12%)\n" +
+             r"Logit-Hurdle $\hat{u} = \alpha\,\sigma(\ell_h)\hat{m} + (1{-}\alpha)\hat{u}$",
+             facecolor="#FFFFFF", edgecolor="#5E35B1", title_size=5.7, sub_size=4.5)
+    draw_box(ax, 0.778, 0.090, 0.208, 0.215, "Exact Disjoint MWIS Paint",
+             r"Max-Weight Indep. Set ($\mathrm{IoU}{>}0.01$)" + "\nDisjoint RLE (results/submission.csv)\n5F 0.4720–0.4726 | F0 0.4856 | LB 0.410",
+             facecolor="#EDE7F6", edgecolor="#4527A0", title_size=5.7, sub_size=4.5)
 
     # Zone 4 internal arrows
     draw_arrow(ax, 0.882, 0.672, 0.882, 0.593, color="#5E35B1")
     draw_arrow(ax, 0.882, 0.372, 0.882, 0.308, color="#5E35B1")
 
-    # Top Bypass Arrow: Zone 2 YOLOv8s-seg -> Zone 4 Core Vote-Map (above Zone 3 boxes)
+    # Top Bypass Arrow: Zone 2 YOLO26x/v8s-seg -> Zone 4 Vote-Map (above Zone 3 boxes)
     draw_arrow(ax, 0.469, 0.795, 0.775, 0.795, color="#2C5E8A", lw=1.05)
-    ax.text(0.614, 0.832, "Direct 1-Stage Masks (Bypasses Stage 2 Crop)",
+    ax.text(0.614, 0.832, "Direct 1-Stage Masks (YOLO26x/v8s-seg Bypass)",
             fontsize=4.5, fontweight="bold", color="#2C5E8A", ha="center", va="center",
             bbox=dict(boxstyle="round,pad=0.18", facecolor="#F4F9FD", edgecolor="#90B8DA", lw=0.6), zorder=5)
 
-    # Zone 3 Per-Stream Painting -> Zone 4 split (7 Core vs 4 Donors, zero crossing)
+    # Zone 3 Candidate Pool -> Zone 4 split (Proposals & 48x48 Crops, zero crossing)
     draw_ortho(ax, [(0.720, 0.195), (0.738, 0.195), (0.738, 0.725), (0.775, 0.725)], color="#2E7D32")
-    ax.text(0.738, 0.565, "7 Core", fontsize=4.2, fontweight="bold", color="#2E7D32",
+    ax.text(0.738, 0.565, "97 Feats", fontsize=4.2, fontweight="bold", color="#2E7D32",
             rotation=90, ha="center", va="center",
             bbox=dict(boxstyle="round,pad=0.08", facecolor="white", edgecolor="none"), zorder=5)
     draw_ortho(ax, [(0.720, 0.125), (0.755, 0.125), (0.755, 0.475), (0.775, 0.475)], color="#5E35B1")
-    ax.text(0.755, 0.295, "4 Donors", fontsize=4.2, fontweight="bold", color="#5E35B1",
+    ax.text(0.755, 0.295, "48² Crops", fontsize=4.2, fontweight="bold", color="#5E35B1",
             rotation=90, ha="center", va="center",
             bbox=dict(boxstyle="round,pad=0.08", facecolor="white", edgecolor="none"), zorder=5)
 
